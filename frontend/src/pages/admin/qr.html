@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Código QR de Asistencia — AsistTrack</title>
+  <meta name="description" content="Pantalla de QR dinámico para control de asistencia. Actualización automática cada hora." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #6366f1;
+      --accent: #10b981;
+      --bg: #0a0a12;
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Animated background */
+    .bg-gradient {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 100% 60% at 50% -10%, rgba(99,102,241,0.25), transparent),
+        radial-gradient(ellipse 60% 60% at 90% 90%, rgba(16,185,129,0.1), transparent);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,0.05) 1px, transparent 1px);
+      background-size: 60px 60px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .content {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+      padding: 2rem;
+      width: 100%;
+      max-width: 700px;
+    }
+
+    /* Header */
+    .qr-header {
+      text-align: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      box-shadow: 0 8px 25px rgba(99,102,241,0.4);
+    }
+
+    .brand-name {
+      font-size: 1.75rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #818cf8, #6ee7b7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .scan-instruction {
+      font-size: 1.125rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    /* QR Display */
+    .qr-container {
+      position: relative;
+    }
+
+    .qr-card {
+      background: white;
+      border-radius: 24px;
+      padding: 2rem;
+      box-shadow:
+        0 0 0 1px rgba(99,102,241,0.3),
+        0 25px 60px rgba(0,0,0,0.5),
+        0 0 80px rgba(99,102,241,0.15);
+      position: relative;
+      transition: transform 0.3s ease;
+    }
+
+    .qr-card:hover { transform: scale(1.01); }
+
+    /* Corner decorations */
+    .qr-card::before,
+    .qr-card::after {
+      content: '';
+      position: absolute;
+      width: 30px; height: 30px;
+      border-color: var(--primary);
+      border-style: solid;
+    }
+
+    .qr-card::before {
+      top: -2px; left: -2px;
+      border-width: 3px 0 0 3px;
+      border-radius: 8px 0 0 0;
+    }
+
+    .qr-card::after {
+      bottom: -2px; right: -2px;
+      border-width: 0 3px 3px 0;
+      border-radius: 0 0 8px 0;
+    }
+
+    #qrImage {
+      display: block;
+      width: 300px;
+      height: 300px;
+      image-rendering: pixelated;
+    }
+
+    #qrPlaceholder {
+      width: 300px;
+      height: 300px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      color: #94a3b8;
+    }
+
+    .qr-spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #e2e8f0;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Status info */
+    .qr-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(16,185,129,0.15);
+      border: 1px solid rgba(16,185,129,0.3);
+      color: #6ee7b7;
+      padding: 0.5rem 1rem;
+      border-radius: 100px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .timer-container {
+      text-align: center;
+    }
+
+    .timer-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.25rem;
+    }
+
+    .timer-display {
+      font-size: 2rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(135deg, #c7d2fe, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .timer-bar-container {
+      width: 200px;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      margin: 0.5rem auto 0;
+      overflow: hidden;
+    }
+
+    .timer-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      border-radius: 2px;
+      transition: width 1s linear;
+    }
+
+    /* Clock display */
+    .clock-section {
+      display: flex;
+      gap: 3rem;
+      align-items: center;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 1.25rem 2.5rem;
+    }
+
+    .clock-item {
+      text-align: center;
+    }
+
+    .clock-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .clock-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 0.25rem;
+    }
+
+    .clock-separator {
+      font-size: 2.5rem;
+      font-weight: 300;
+      color: var(--text-muted);
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    .date-display {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      text-align: center;
+    }
+
+    /* Error state */
+    .error-card {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      max-width: 400px;
+    }
+
+    .btn-retry {
+      margin-top: 1rem;
+      padding: 0.6rem 1.5rem;
+      background: linear-gradient(135deg, var(--primary), #4f46e5);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-retry:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="grid-bg"></div>
+
+  <div class="content">
+    <!-- Header -->
+    <div class="qr-header">
+      <div class="brand">
+        <div class="brand-icon">🛡️</div>
+        <span class="brand-name">AsistTrack</span>
+      </div>
+      <p class="scan-instruction">Escanea el código con tu dispositivo para registrar tu asistencia</p>
+    </div>
+
+    <!-- QR Card -->
+    <div class="qr-container">
+      <div class="qr-card">
+        <img id="qrImage" class="hidden" alt="Código QR de Asistencia" />
+        <div id="qrPlaceholder">
+          <div class="qr-spinner"></div>
+          <span>Cargando QR...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="qr-info">
+      <div class="status-badge" id="statusBadge">
+        <div class="status-dot"></div>
+        <span id="statusText">Cargando...</span>
+      </div>
+
+      <div class="timer-container" id="timerContainer">
+        <div class="timer-label">Rota en</div>
+        <div class="timer-display" id="timerDisplay">--:--</div>
+        <div class="timer-bar-container">
+          <div class="timer-bar" id="timerBar" style="width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorCard" class="error-card hidden">
+      <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚠️</div>
+      <div style="font-weight: 600; margin-bottom: 0.5rem;" id="errorTitle">Sin conexión al servidor</div>
+      <div style="font-size: 0.875rem; color: var(--text-muted);" id="errorMsg">No se pudo cargar el código QR. Verifica la conexión.</div>
+      <button class="btn-retry" onclick="connectWebSocket()">Reintentar</button>
+    </div>
+
+    <!-- Clock -->
+    <div class="clock-section">
+      <div class="clock-item">
+        <div class="clock-value" id="clockHours">--</div>
+        <div class="clock-label">Horas</div>
+      </div>
+      <div class="clock-separator">:</div>
+      <div class="clock-item">
+        <div class="clock-value" id="clockMinutes">--</div>
+        <div class="clock-label">Minutos</div>
+      </div>
+      <div class="clock-separator">:</div>
+      <div class="clock-item">
+        <div class="clock-value" id="clockSeconds">--</div>
+        <div class="clock-label">Segundos</div>
+      </div>
+    </div>
+    <div class="date-display" id="dateDisplay">Cargando fecha...</div>
+  </div>
+
+  <script>
+    // Clock
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('clockHours').textContent = h;
+      document.getElementById('clockMinutes').textContent = m;
+      document.getElementById('clockSeconds').textContent = s;
+
+      const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+      const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      document.getElementById('dateDisplay').textContent =
+        `${days[now.getDay()]}, ${now.getDate()} de ${months[now.getMonth()]} de ${now.getFullYear()}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // QR Timer
+    let expiresAt = null;
+    let totalDuration = null;
+
+    function updateTimer() {
+      if (!expiresAt) return;
+      const now = Date.now();
+      const remaining = expiresAt - now;
+
+      if (remaining <= 0) {
+        document.getElementById('timerDisplay').textContent = '00:00';
+        document.getElementById('timerBar').style.width = '0%';
+        return;
+      }
+
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      document.getElementById('timerDisplay').textContent =
+        `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+
+      if (totalDuration) {
+        const pct = Math.max(0, (remaining / totalDuration) * 100);
+        document.getElementById('timerBar').style.width = pct + '%';
+      }
+    }
+    setInterval(updateTimer, 1000);
+
+    // WebSocket connection
+    let ws = null;
+    let reconnectTimeout = null;
+
+    function connectWebSocket() {
+      const errorCard = document.getElementById('errorCard');
+      errorCard.classList.add('hidden');
+
+      const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/qr`;
+
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (err) {
+        showError('Error de conexión', 'No se pudo conectar al servidor WebSocket.');
+        return;
+      }
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        document.getElementById('statusText').textContent = 'En vivo · Actualización automática';
+        document.getElementById('statusBadge').style.borderColor = 'rgba(16,185,129,0.3)';
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'QR_UPDATED' && data.image) {
+            const img = document.getElementById('qrImage');
+            const placeholder = document.getElementById('qrPlaceholder');
+
+            img.src = data.image;
+            img.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+
+            // Set timer
+            if (data.expiresAt) {
+              expiresAt = new Date(data.expiresAt).getTime();
+              const now = Date.now();
+              totalDuration = expiresAt - now;
+            }
+
+            document.getElementById('statusText').textContent = 'QR activo · Actualización automática';
+            updateTimer();
+          }
+        } catch (err) {
+          console.error('Error parsing WS message:', err);
+        }
+      };
+
+      ws.onerror = () => {
+        console.error('WebSocket error');
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket closed, reconnecting in 5s...');
+        document.getElementById('statusText').textContent = 'Reconectando...';
+        reconnectTimeout = setTimeout(connectWebSocket, 5000);
+      };
+    }
+
+    function showError(title, msg) {
+      document.getElementById('errorTitle').textContent = title;
+      document.getElementById('errorMsg').textContent = msg;
+      document.getElementById('errorCard').classList.remove('hidden');
+    }
+
+    // Start
+    connectWebSocket();
+  </script>
+</body>
+</html>

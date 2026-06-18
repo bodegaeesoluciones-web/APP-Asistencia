@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Administrativo - Sistema de Asistencia</title>
+  <link rel="stylesheet" href="/src/css/main.css" />
+  <link rel="stylesheet" href="/src/css/admin.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <i data-lucide="shield-check"></i>
+        <span>Admin Panel</span>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <a href="#" class="sidebar-link active" data-view="dashboard">
+          <i data-lucide="layout-dashboard"></i> Dashboard
+        </a>
+        <a href="/src/pages/admin/qr.html" target="_blank" class="sidebar-link">
+          <i data-lucide="qr-code"></i> Pantalla QR
+        </a>
+        <a href="#" class="sidebar-link" data-view="users">
+          <i data-lucide="users"></i> Técnicos
+        </a>
+        <a href="#" class="sidebar-link" data-view="history">
+          <i data-lucide="history"></i> Historial
+        </a>
+        <a href="#" class="sidebar-link" data-view="reports">
+          <i data-lucide="file-spreadsheet"></i> Reportes
+        </a>
+        <a href="#" class="sidebar-link" data-view="devices">
+          <i data-lucide="smartphone"></i> Dispositivos
+        </a>
+        <a href="#" class="sidebar-link" data-view="settings">
+          <i data-lucide="settings"></i> Configuración
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="text-sm mb-2" id="adminName">Cargando...</div>
+        <button id="logoutBtn" class="btn btn-outline-primary btn-sm btn-block" style="color: white; border-color: rgba(255,255,255,0.5);">
+          Cerrar Sesión
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <h2 id="pageTitle" class="m-0" style="font-size: 1.25rem;">Dashboard</h2>
+        <div id="clockDisplay" class="font-weight-bold text-primary"></div>
+      </header>
+
+      <div class="content-body" id="mainBody">
+        
+        <!-- DASHBOARD VIEW -->
+        <div id="view-dashboard" class="view-section">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon primary"><i data-lucide="users"></i></div>
+              <div class="stat-details">
+                <p>Técnicos Activos</p>
+                <h3 id="dash-total">-</h3>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon success"><i data-lucide="user-check"></i></div>
+              <div class="stat-details">
+                <p>Presentes Ahora</p>
+                <h3 id="dash-present">-</h3>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon warning"><i data-lucide="clock"></i></div>
+              <div class="stat-details">
+                <p>Llegadas Tardías</p>
+                <h3 id="dash-late">-</h3>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon danger"><i data-lucide="user-x"></i></div>
+              <div class="stat-details">
+                <p>Ausentes Ahora</p>
+                <h3 id="dash-absent">-</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="row d-flex gap-3">
+            <div class="card flex-1" style="min-width: 300px;">
+              <div class="card-body">
+                <h4 class="card-title">Resumen de Hoy</h4>
+                <div class="d-flex justify-content-between border-bottom py-2">
+                  <span>Entradas registradas:</span>
+                  <strong id="dash-entries">-</strong>
+                </div>
+                <div class="d-flex justify-content-between border-bottom py-2">
+                  <span>Salidas registradas:</span>
+                  <strong id="dash-exits">-</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="card flex-1" style="min-width: 300px;">
+              <div class="card-body">
+                <h4 class="card-title">Acciones Rápidas</h4>
+                <a href="/src/pages/admin/qr.html" target="_blank" class="btn btn-primary mb-2 btn-block d-flex align-items-center justify-content-center gap-2">
+                  <i data-lucide="external-link"></i> Abrir Pantalla QR
+                </a>
+                <button class="btn btn-outline-primary mb-2 btn-block d-flex align-items-center justify-content-center gap-2" onclick="document.querySelector('[data-view=\\'users\\']').click()">
+                  <i data-lucide="user-plus"></i> Gestionar Técnicos
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- USERS VIEW -->
+        <div id="view-users" class="view-section hidden">
+          <div class="d-flex justify-content-between mb-3 align-items-center">
+            <h3 class="m-0">Gestión de Técnicos</h3>
+            <button class="btn btn-primary" id="btnNewUser">
+              <i data-lucide="plus"></i> Nuevo Técnico
+            </button>
+          </div>
+          
+          <div class="card">
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>Nombre Completo</th>
+                    <th>Cargo</th>
+                    <th>Móvil</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <tr><td colspan="6" class="text-center">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- HISTORY VIEW -->
+        <div id="view-history" class="view-section hidden">
+          <h3 class="mb-3">Historial Global</h3>
+          <div class="card">
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Fecha y Hora</th>
+                    <th>Técnico</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Motivo Rechazo</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                  <tr><td colspan="5" class="text-center">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card-body p-2 border-top text-center" id="historyPagination">
+              <button class="btn btn-sm btn-outline-primary" id="btnHistPrev">Anterior</button>
+              <span class="mx-2" id="histPageInfo">Página 1</span>
+              <button class="btn btn-sm btn-outline-primary" id="btnHistNext">Siguiente</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- REPORTS VIEW -->
+        <div id="view-reports" class="view-section hidden">
+          <h3 class="mb-3">Generación de Reportes</h3>
+          <div class="card" style="max-width: 600px;">
+            <div class="card-body">
+              <form id="reportForm">
+                <div class="row d-flex gap-3 mb-3">
+                  <div class="form-group flex-1">
+                    <label class="form-label">Fecha Inicio</label>
+                    <input type="date" class="form-control" id="repStartDate">
+                  </div>
+                  <div class="form-group flex-1">
+                    <label class="form-label">Fecha Fin</label>
+                    <input type="date" class="form-control" id="repEndDate">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Estado de Asistencia</label>
+                  <select class="form-control" id="repStatus">
+                    <option value="">Todos</option>
+                    <option value="valid">Solo Válidos</option>
+                    <option value="invalid">Solo Rechazados</option>
+                  </select>
+                </div>
+                
+                <div class="mt-4 d-flex gap-2">
+                  <button type="button" class="btn btn-success flex-1" id="btnExportExcel">
+                    <i data-lucide="file-spreadsheet"></i> Descargar Excel
+                  </button>
+                  <button type="button" class="btn btn-danger flex-1" id="btnExportPdf">
+                    <i data-lucide="file-text"></i> Descargar PDF
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- DEVICES VIEW -->
+        <div id="view-devices" class="view-section hidden">
+          <h3 class="mb-3">Dispositivos Autorizados</h3>
+          <div class="alert alert-info">
+            <i data-lucide="info" style="width: 16px; height: 16px; display:inline-block; vertical-align:middle;"></i>
+            Si un técnico cambia de celular, debe eliminar su dispositivo actual aquí para que el sistema le permita registrar el nuevo al iniciar sesión.
+          </div>
+          <div class="card">
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Técnico</th>
+                    <th>Dispositivo</th>
+                    <th>Última IP</th>
+                    <th>Fecha Registro</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="devicesTableBody">
+                  <tr><td colspan="5" class="text-center">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SETTINGS VIEW -->
+        <div id="view-settings" class="view-section hidden">
+          <h3 class="mb-3">Configuración del Sistema</h3>
+          <div class="card" style="max-width: 800px;">
+            <div class="card-body">
+              <form id="settingsForm">
+                <h5 class="border-bottom pb-2 mb-3">Ubicación de la Base</h5>
+                <div class="row d-flex gap-3 mb-3">
+                  <div class="form-group flex-1">
+                    <label class="form-label">Latitud</label>
+                    <input type="number" step="any" class="form-control" id="set_base_lat" required>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label class="form-label">Longitud</label>
+                    <input type="number" step="any" class="form-control" id="set_base_lng" required>
+                  </div>
+                </div>
+                <div class="form-group mb-4" style="max-width: 200px;">
+                  <label class="form-label">Radio Permitido (metros)</label>
+                  <input type="number" class="form-control" id="set_allowed_radius_m" required>
+                </div>
+
+                <h5 class="border-bottom pb-2 mb-3">Conectividad</h5>
+                <div class="form-group mb-4" style="max-width: 400px;">
+                  <label class="form-label">SSID WiFi Oficial</label>
+                  <input type="text" class="form-control" id="set_authorized_ssid" required>
+                  <small class="text-muted">Nombre exacto de la red WiFi</small>
+                </div>
+
+                <h5 class="border-bottom pb-2 mb-3">Sistema y Horarios</h5>
+                <div class="row d-flex gap-3 mb-3">
+                  <div class="form-group flex-1">
+                    <label class="form-label">Rotación QR (minutos)</label>
+                    <input type="number" class="form-control" id="set_qr_rotation_minutes" required min="1">
+                  </div>
+                  <div class="form-group flex-1">
+                    <label class="form-label">Hora de Tardanza (0-23)</label>
+                    <input type="number" class="form-control" id="set_late_hour" required min="0" max="23">
+                  </div>
+                  <div class="form-group flex-1">
+                    <label class="form-label">Minuto Tardanza</label>
+                    <input type="number" class="form-control" id="set_late_minute" required min="0" max="59">
+                  </div>
+                </div>
+
+                <div id="settingsAlert"></div>
+                <button type="submit" class="btn btn-primary mt-3" id="btnSaveSettings">Guardar Configuración</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- User Form Modal -->
+  <div class="modal" id="userModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 id="userModalTitle">Nuevo Técnico</h5>
+        <button class="modal-close" onclick="closeUserModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="userFormAlert"></div>
+        <form id="userForm">
+          <input type="hidden" id="userId">
+          
+          <div class="form-group">
+            <label class="form-label">Usuario (Login)</label>
+            <input type="text" class="form-control" id="u_username" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Nombre Completo</label>
+            <input type="text" class="form-control" id="u_fullname" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Contraseña <small id="pwdHelp" class="text-muted">(Dejar en blanco para mantener actual)</small></label>
+            <input type="password" class="form-control" id="u_password">
+          </div>
+
+          <div class="row d-flex gap-2 mb-3">
+            <div class="form-group flex-1">
+              <label class="form-label">Móvil Asignado</label>
+              <input type="text" class="form-control" id="u_mobile">
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label">Cargo</label>
+              <input type="text" class="form-control" id="u_position">
+            </div>
+          </div>
+
+          <div class="form-group" id="statusGroup" style="display:none;">
+            <label class="form-label">Estado</label>
+            <select class="form-control" id="u_status">
+              <option value="active">Activo</option>
+              <option value="inactive">Inactivo</option>
+            </select>
+          </div>
+
+          <div class="modal-footer px-0 pb-0 mt-4">
+            <button type="button" class="btn btn-outline-secondary" onclick="closeUserModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="btnSaveUser">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/js/admin/app.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

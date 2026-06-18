@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi Asistencia - Técnico</title>
+  <link rel="stylesheet" href="/src/css/main.css" />
+  <link rel="stylesheet" href="/src/css/technician.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  
+  <div class="tech-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h3 class="mb-1" id="userName">Cargando...</h3>
+        <span class="badge bg-primary">Técnico</span>
+      </div>
+      <button id="logoutBtn" class="btn btn-outline-danger btn-sm">Salir</button>
+    </div>
+
+    <!-- MAIN VIEW -->
+    <div id="view-home">
+      <div class="status-card">
+        <div id="statusIcon">
+          <i data-lucide="clock" style="width: 48px; height: 48px; opacity: 0.8;"></i>
+        </div>
+        <div class="status-time" id="currentTime">--:--</div>
+        <div class="status-date" id="currentDate">Cargando fecha...</div>
+        <div class="mt-3">
+          <span class="badge bg-light text-dark" id="currentStatusBadge">Estado: Verificando...</span>
+        </div>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <button id="btnScanQR" class="btn btn-primary btn-block action-btn">
+        <i data-lucide="qr-code"></i> Escanear Código QR
+      </button>
+
+      <h4 class="mt-4 mb-3">Asistencia de Hoy</h4>
+      <ul class="history-list" id="todayHistoryList">
+        <li class="text-center text-muted p-3">Cargando registros...</li>
+      </ul>
+    </div>
+
+    <!-- SCANNER VIEW (Hidden by default) -->
+    <div id="view-scanner" class="hidden">
+      <h4 class="mb-3">Validación de Asistencia</h4>
+      
+      <div class="card mb-3">
+        <div class="card-body p-3">
+          <div class="validation-step" id="val-gps">
+            <div class="validation-icon pending"><i data-lucide="map-pin"></i></div>
+            <div>
+              <strong>Ubicación GPS</strong>
+              <div class="text-muted" style="font-size: 0.8rem;" id="val-gps-text">Obteniendo coordenadas...</div>
+            </div>
+          </div>
+          
+          <div class="validation-step" id="val-wifi">
+            <div class="validation-icon pending"><i data-lucide="wifi"></i></div>
+            <div>
+              <strong>Red WiFi</strong>
+              <div class="text-muted" style="font-size: 0.8rem;" id="val-wifi-text">Verificando red...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SSID Confirmation Checkbox (Since browser can't read SSID) -->
+      <div id="wifiConfirmContainer" class="card mb-3 hidden border-warning">
+        <div class="card-body p-3 bg-light">
+          <div class="form-check d-flex align-items-center gap-2">
+            <input type="checkbox" id="wifiConfirmCheck" class="form-check-input" style="width: 20px; height: 20px;">
+            <label for="wifiConfirmCheck" class="form-check-label font-weight-bold">
+              Confirmo que estoy conectado a la red WiFi oficial de la base
+            </label>
+          </div>
+          <small class="text-muted d-block mt-2">Por restricciones de privacidad, necesitamos su confirmación manual. El servidor verificará su IP interna.</small>
+        </div>
+      </div>
+
+      <div id="scannerContainer" class="hidden">
+        <p class="text-center text-muted mb-2">Escanee el código QR mostrado en recepción</p>
+        <div id="reader"></div>
+        <button id="btnCancelScan" class="btn btn-outline-danger btn-block mt-3">Cancelar</button>
+      </div>
+      
+      <div id="scannerAlertContainer"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <a href="#" class="nav-item active" id="nav-home">
+      <i data-lucide="home"></i>
+      Inicio
+    </a>
+    <a href="#" class="nav-item" id="nav-history">
+      <i data-lucide="calendar"></i>
+      Historial
+    </a>
+  </nav>
+
+  <!-- Modal Historial -->
+  <div class="modal" id="historyModal">
+    <div class="modal-content" style="max-height: 80vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <h5>Mi Historial Completo</h5>
+        <button class="modal-close" id="closeHistoryModal">&times;</button>
+      </div>
+      <div class="modal-body" style="overflow-y: auto; flex: 1;">
+        <ul class="history-list" id="fullHistoryList">
+          <li class="text-center text-muted">Cargando...</li>
+        </ul>
+        <div class="text-center mt-3 hidden" id="historyLoadMoreContainer">
+          <button class="btn btn-outline-primary btn-sm" id="btnLoadMoreHistory">Cargar más</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script type="module" src="/src/js/technician/app.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
