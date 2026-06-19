@@ -18,7 +18,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: './index.html',
-        login: './src/pages/login.html',
         technician: './src/pages/technician/index.html',
         admin: './src/pages/admin/index.html',
         qr: './src/pages/admin/qr.html'

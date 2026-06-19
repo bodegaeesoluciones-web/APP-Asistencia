@@ -1,16 +1,15 @@
 const { pool } = require('../config/db');
 const { haversineDistance } = require('../utils/haversine');
-const qrService = require('../services/qrService');
 const { getSettings } = require('../services/settingsService');
 const { logAudit } = require('../utils/audit');
 
 exports.markAttendance = async (req, res) => {
-  const { latitude, longitude, gpsAccuracy, wifiSsid, qrToken } = req.body;
+  const { latitude, longitude, gpsAccuracy, wifiSsid } = req.body;
   const user = req.user;
   const device = req.device;
 
-  if (!latitude || !longitude || !qrToken) {
-    return res.status(400).json({ error: 'Faltan datos requeridos (GPS o QR)' });
+  if (!latitude || !longitude) {
+    return res.status(400).json({ error: 'Faltan datos requeridos (GPS)' });
   }
 
   try {
@@ -24,12 +23,7 @@ exports.markAttendance = async (req, res) => {
     let isValid = true;
     let rejectionReasons = [];
 
-    // 2. Validate QR Token
-    const validToken = await qrService.validateToken(qrToken);
-    if (!validToken) {
-      isValid = false;
-      rejectionReasons.push('QR inválido o expirado');
-    }
+    // 2. (Removed QR Validation)
 
     // 3. Validate GPS
     const distance = haversineDistance(latitude, longitude, baseLat, baseLng);
@@ -79,7 +73,7 @@ exports.markAttendance = async (req, res) => {
         wifiSsid,
         wifiSsid === authorizedSsid, // Confirmed if it matches
         req.ip,
-        validToken ? validToken.id : null,
+        null, // No QR token id anymore
         isValid,
         rejectionReasons.join('; ') || null
       ]

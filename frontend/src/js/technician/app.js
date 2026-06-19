@@ -1,7 +1,6 @@
-import { api, showAlert, clearAlert, logout, formatError } from '../api.js';
+import { api, showAlert, clearAlert, formatError } from '../api.js';
+import { logout } from '../auth.js';
 import { getGPSLocation, getWiFiSSID } from '../gps.js';
-
-let html5QrCode = null;
 let currentGPS = null;
 let wifiConfirmed = false;
 let authorizedSsidSettings = 'EESOLUCIONES_BASE'; // Will be fetched from backend if possible or assumed
@@ -29,8 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Event Listeners
   document.getElementById('logoutBtn').addEventListener('click', logout);
   
-  document.getElementById('btnScanQR').addEventListener('click', startValidationFlow);
-  document.getElementById('btnCancelScan').addEventListener('click', stopScanner);
+  document.getElementById('btnMarkAttendance').addEventListener('click', startValidationFlow);
   
   document.getElementById('nav-home').addEventListener('click', (e) => {
     e.preventDefault();
@@ -58,9 +56,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       text.classList.remove('text-danger');
       text.classList.add('text-success');
       
-      // If GPS is also done, show scanner
+      // If GPS is also done, execute attendance
       if (currentGPS) {
-        showScanner();
+        processAttendance();
       }
     } else {
       icon.className = 'validation-icon error';
@@ -68,7 +66,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       text.textContent = 'Requiere confirmación';
       text.classList.remove('text-success');
       text.classList.add('text-danger');
-      document.getElementById('scannerContainer').classList.add('hidden');
     }
     lucide.createIcons();
   });
@@ -83,7 +80,6 @@ function switchView(view) {
   if (view === 'home') {
     document.getElementById('view-home').classList.remove('hidden');
     document.getElementById('nav-home').classList.add('active');
-    stopScanner();
   } else if (view === 'scanner') {
     document.getElementById('view-scanner').classList.remove('hidden');
   }
@@ -147,8 +143,7 @@ async function loadTodayHistory() {
 
 async function startValidationFlow() {
   switchView('scanner');
-  clearAlert('scannerAlertContainer');
-  document.getElementById('scannerContainer').classList.add('hidden');
+  clearAlert('validationAlertContainer');
   document.getElementById('wifiConfirmContainer').classList.add('hidden');
   
   // Reset UI
@@ -184,7 +179,7 @@ async function startValidationFlow() {
     gpsIcon.innerHTML = '<i data-lucide="x-circle"></i>';
     gpsText.textContent = err.message;
     gpsText.className = 'text-danger';
-    showAlert('scannerAlertContainer', `GPS Error: ${err.message}. Asegúrese de tener el GPS encendido y permisos otorgados.`);
+    showAlert('validationAlertContainer', `GPS Error: ${err.message}. Asegúrese de tener el GPS encendido y permisos otorgados.`);
     lucide.createIcons();
     return; // Stop flow
   }
@@ -202,13 +197,13 @@ async function startValidationFlow() {
         wifiIcon.innerHTML = '<i data-lucide="check-circle"></i>';
         wifiText.textContent = `Conectado a ${ssid}`;
         wifiText.className = 'text-success';
-        showScanner();
+        processAttendance();
       } else {
         wifiIcon.className = 'validation-icon error';
         wifiIcon.innerHTML = '<i data-lucide="x-circle"></i>';
         wifiText.textContent = `Red incorrecta (${ssid})`;
         wifiText.className = 'text-danger';
-        showAlert('scannerAlertContainer', `Debe estar conectado a la red oficial. Red actual: ${ssid}`);
+        showAlert('validationAlertContainer', `Debe estar conectado a la red oficial. Red actual: ${ssid}`);
       }
       lucide.createIcons();
     } else {
@@ -226,42 +221,7 @@ async function startValidationFlow() {
   }
 }
 
-function showScanner() {
-  document.getElementById('scannerContainer').classList.remove('hidden');
-  if (!html5QrCode) {
-    html5QrCode = new Html5Qrcode("reader");
-  }
-  
-  const qrCodeSuccessCallback = async (decodedText, decodedResult) => {
-    // Stop scanner immediately to prevent multiple scans
-    await stopScanner();
-    
-    // Process Attendance
-    await processAttendance(decodedText);
-  };
-
-  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-
-  // Use facingMode: environment for rear camera
-  html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
-    .catch(err => {
-      console.error("Camera start error", err);
-      showAlert('scannerAlertContainer', 'Error al iniciar la cámara. Verifique los permisos.');
-    });
-}
-
-async function stopScanner() {
-  if (html5QrCode && html5QrCode.isScanning) {
-    try {
-      await html5QrCode.stop();
-    } catch (err) {
-      console.error("Failed to stop scanner", err);
-    }
-  }
-  document.getElementById('scannerContainer').classList.add('hidden');
-}
-
-async function processAttendance(qrToken) {
+async function processAttendance() {
   try {
     showAlert('alertContainer', 'Procesando validación de asistencia...', 'info');
     switchView('home');
@@ -273,8 +233,7 @@ async function processAttendance(qrToken) {
       latitude: currentGPS.latitude,
       longitude: currentGPS.longitude,
       gpsAccuracy: currentGPS.accuracy,
-      wifiSsid: ssidToSend,
-      qrToken: qrToken
+      wifiSsid: ssidToSend
     });
 
     showAlert('alertContainer', data.message, 'success');

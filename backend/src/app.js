@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const http = require('http');
+const path = require('path');
 const WebSocket = require('ws');
 const env = require('./config/env');
 const qrService = require('./services/qrService');
@@ -58,6 +59,15 @@ app.use('/api/reports', reportsRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });
+});
+
+// Servir frontend estático (build de Vite)
+const frontendPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendPath));
+
+// Catch-all: cualquier ruta no-API devuelve el index.html del frontend
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
 // Global Error Handler

@@ -34,8 +34,8 @@
 
       <div id="alertContainer"></div>
 
-      <button id="btnScanQR" class="btn btn-primary btn-block action-btn">
-        <i data-lucide="qr-code"></i> Escanear Código QR
+      <button id="btnMarkAttendance" class="btn btn-primary btn-block action-btn">
+        <i data-lucide="check-circle"></i> Marcar Asistencia
       </button>
 
       <h4 class="mt-4 mb-3">Asistencia de Hoy</h4>
@@ -81,13 +81,7 @@
         </div>
       </div>
 
-      <div id="scannerContainer" class="hidden">
-        <p class="text-center text-muted mb-2">Escanee el código QR mostrado en recepción</p>
-        <div id="reader"></div>
-        <button id="btnCancelScan" class="btn btn-outline-danger btn-block mt-3">Cancelar</button>
-      </div>
-      
-      <div id="scannerAlertContainer"></div>
+      <div id="validationAlertContainer"></div>
     </div>
   </div>
 
@@ -121,7 +115,6 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script type="module" src="/src/js/technician/app.js"></script>
   <script>
     lucide.createIcons();
