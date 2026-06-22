@@ -6,14 +6,14 @@ let wifiConfirmed = false;
 let authorizedSsidSettings = 'EESOLUCIONES_BASE'; // Will be fetched from backend if possible or assumed
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const userStr = localStorage.getItem('user');
-  if (!userStr) {
+  const userId = localStorage.getItem('userId');
+  const userName = localStorage.getItem('userName');
+  if (!userId) {
     window.location.href = '/';
     return;
   }
 
-  const user = JSON.parse(userStr);
-  document.getElementById('userName').textContent = user.fullName;
+  document.getElementById('userName').textContent = userName || 'Técnico';
 
   // Real-time clock
   setInterval(() => {
