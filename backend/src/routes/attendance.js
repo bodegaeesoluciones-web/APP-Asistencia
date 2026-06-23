@@ -22,7 +22,7 @@ router.post(
   [
     body('latitude').isFloat().withMessage('Latitud inválida'),
     body('longitude').isFloat().withMessage('Longitud inválida'),
-    body('qrToken').notEmpty().withMessage('Token QR requerido'),
+    // qrToken removed — QR scanning is no longer required for attendance
   ],
   validateRequest,
   attendanceController.markAttendance

@@ -46,8 +46,10 @@ app.use(cors({
 app.use(morgan('dev'));
 app.use(express.json());
 
-// Start QR Rotation
-qrService.startRotationInterval();
+// Start QR Rotation (async — catch errors so a slow DB cold-start doesn't crash the process)
+qrService.startRotationInterval().catch(err => {
+  console.error('QR rotation startup error (non-fatal, will retry on next interval):', err.message);
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);
