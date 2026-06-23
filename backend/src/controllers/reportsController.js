@@ -3,6 +3,22 @@ const PDFDocument = require('pdfkit');
 const { pool } = require('../config/db');
 const { getSettings } = require('../services/settingsService');
 
+async function getAttendance(req) {
+  // Reuse filtered attendance logic
+  const rows = await getFilteredAttendance(req);
+  return rows;
+}
+
+exports.getAttendance = async (req, res) => {
+  try {
+    const data = await getAttendance(req);
+    res.json(data);
+  } catch (err) {
+    console.error('Attendance fetch error:', err);
+    res.status(500).json({ error: 'Error al obtener datos de asistencia' });
+  }
+};
+
 async function getFilteredAttendance(req) {
   const { startDate, endDate, userId, status } = req.query;
   const settings = await getSettings();
@@ -11,7 +27,8 @@ async function getFilteredAttendance(req) {
   let query = `
     SELECT a.id, a.type, a.timestamp AT TIME ZONE $1 as local_time, 
            a.is_valid, a.rejection_reason, a.latitude, a.longitude,
-           u.full_name as user_name, u.mobile_number, d.device_name
+           a.photo_url, a.ip_address,
+           u.full_name as user_name, u.username as cedula, u.position as user_position, u.mobile_number, d.device_name
     FROM attendance a
     JOIN users u ON a.user_id = u.id
     LEFT JOIN devices d ON a.device_id = d.id
@@ -51,13 +68,17 @@ exports.exportExcel = async (req, res) => {
       Fecha: new Date(r.local_time).toLocaleDateString(),
       Hora: new Date(r.local_time).toLocaleTimeString(),
       Técnico: r.user_name,
+      Cédula: r.cedula || '-',
+      Cargo: r.user_position || '-',
       Móvil: r.mobile_number,
       Tipo: r.type === 'entry' ? 'Entrada' : 'Salida',
       Estado: r.is_valid ? 'Válido' : 'Rechazado',
       Motivo_Rechazo: r.rejection_reason || '-',
       Dispositivo: r.device_name || '-',
       Latitud: r.latitude,
-      Longitud: r.longitude
+      Longitud: r.longitude,
+      Dirección_IP: r.ip_address || '-',
+      Evidencia: r.photo_url || '-'
     }));
 
     const ws = xlsx.utils.json_to_sheet(data);
