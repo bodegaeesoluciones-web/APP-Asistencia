@@ -40,7 +40,7 @@ exports.markAttendance = async (req, res) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const { rows: todayRecords } = await pool.query(
       `SELECT type FROM attendance
-       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = $3
+       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = $3 AND is_valid = true
        ORDER BY timestamp DESC`,
       [user.id, settings.timezone || 'America/Lima', todayStr]
     );
@@ -134,9 +134,11 @@ exports.getTodayAttendance = async (req, res) => {
     );
 
     // Derive next expected action so the frontend shows the right label
+    // Only consider valid records to toggle the action
     let nextAction = 'entry';
-    if (rows.length > 0) {
-      nextAction = rows[rows.length - 1].type === 'entry' ? 'exit' : 'entry';
+    const validRecords = rows.filter(r => r.is_valid);
+    if (validRecords.length > 0) {
+      nextAction = validRecords[validRecords.length - 1].type === 'entry' ? 'exit' : 'entry';
     }
 
     res.json({ records: rows, nextAction });
