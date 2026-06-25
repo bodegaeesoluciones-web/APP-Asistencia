@@ -36,19 +36,13 @@ exports.markAttendance = async (req, res) => {
     // 3. WiFi validation REMOVED — no longer required
     // (WiFi SSID is still saved to DB if sent, but it does not affect validity)
 
-    // 4. Determine if entry or exit (backend decides — user never chooses)
-    const todayStr = new Date().toISOString().split('T')[0];
-    const { rows: todayRecords } = await pool.query(
-      `SELECT type FROM attendance
-       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = $3 AND is_valid = true
-       ORDER BY timestamp DESC`,
-      [user.id, settings.timezone || 'America/Lima', todayStr]
-    );
-
-    let type = 'entry';
-    if (todayRecords.length > 0) {
-      type = todayRecords[0].type === 'entry' ? 'exit' : 'entry';
-    }
+    // 4. Determine if entry or exit based strictly on time
+    // Before 12:00 PM = Entrada, 12:00 PM or later = Salida
+    const now = new Date();
+    const localTime = new Date(now.toLocaleString('en-US', { timeZone: settings.timezone || 'America/Lima' }));
+    const currentHour = localTime.getHours();
+    
+    const type = currentHour < 12 ? 'entry' : 'exit';
 
     // 5. Upload photo to Dropbox (non-blocking: failure won't block attendance record)
     let photoUrl = null;
@@ -133,13 +127,10 @@ exports.getTodayAttendance = async (req, res) => {
       [req.user.id, settings.timezone || 'America/Lima', todayStr]
     );
 
-    // Derive next expected action so the frontend shows the right label
-    // Only consider valid records to toggle the action
-    let nextAction = 'entry';
-    const validRecords = rows.filter(r => r.is_valid);
-    if (validRecords.length > 0) {
-      nextAction = validRecords[validRecords.length - 1].type === 'entry' ? 'exit' : 'entry';
-    }
+    // Derive next expected action strictly by time
+    const now = new Date();
+    const localTime = new Date(now.toLocaleString('en-US', { timeZone: settings.timezone || 'America/Lima' }));
+    const nextAction = localTime.getHours() < 12 ? 'entry' : 'exit';
 
     res.json({ records: rows, nextAction });
   } catch (err) {
