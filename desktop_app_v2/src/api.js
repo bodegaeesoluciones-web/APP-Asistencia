@@ -13,6 +13,7 @@ class APIClient {
     this.refreshToken = sessionStorage.getItem('refresh_token');
     this.userId = sessionStorage.getItem('user_id');
     this.user = JSON.parse(sessionStorage.getItem('user_info') || 'null');
+    this.refreshPromise = null;
   }
 
   saveSession(data) {
@@ -74,24 +75,34 @@ class APIClient {
   async _refresh() {
     // Need both refreshToken and userId to call the backend
     if (!this.refreshToken || !this.userId) return false;
-    try {
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // Backend expects: { refreshToken, userId } (NOT refresh_token)
-        body: JSON.stringify({ refreshToken: this.refreshToken, userId: this.userId })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        // Backend returns only { accessToken } on refresh — keep existing user/refreshToken
-        this.accessToken = data.accessToken || data.access_token;
-        sessionStorage.setItem('access_token', this.accessToken);
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
+    
+    // If a refresh is already in progress, wait for it instead of making a duplicate request
+    if (this.refreshPromise) {
+      return await this.refreshPromise;
     }
+
+    this.refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: this.refreshToken, userId: this.userId })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          this.accessToken = data.accessToken || data.access_token;
+          sessionStorage.setItem('access_token', this.accessToken);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return await this.refreshPromise;
   }
 
   async request(path, options = {}) {
