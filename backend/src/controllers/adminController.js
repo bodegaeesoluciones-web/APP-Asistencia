@@ -68,7 +68,10 @@ exports.getUsers = async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
   try {
     const { rows } = await pool.query(
-      `SELECT id, username, full_name, role, status, mobile_number, position, created_at 
+      `SELECT id, username, full_name, role, status, mobile_number, position,
+              base_lat, base_lng, allowed_radius_m,
+              entry_time, exit_time,
+              created_at 
        FROM users WHERE role = 'technician'
        ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
       [limit, offset]
@@ -81,13 +84,18 @@ exports.getUsers = async (req, res) => {
 };
 
 exports.createUser = async (req, res) => {
-  const { username, password, fullName, mobileNumber, position } = req.body;
+  const {
+    username, password, fullName, mobileNumber = null,
+    position = null, status = 'active',
+    base_lat = null, base_lng = null, allowed_radius_m = null,
+    entry_time = '07:30', exit_time = '16:30'
+  } = req.body;
   try {
     const hash = await bcrypt.hash(password, 12);
     const { rows } = await pool.query(
-      `INSERT INTO users (username, password_hash, full_name, role, mobile_number, position)
-       VALUES ($1, $2, $3, 'technician', $4, $5) RETURNING id, username, full_name`,
-      [username, hash, fullName, mobileNumber, position]
+      `INSERT INTO users (username, password_hash, full_name, role, mobile_number, position, status, base_lat, base_lng, allowed_radius_m, entry_time, exit_time)
+       VALUES ($1, $2, $3, 'technician', $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, username, full_name`,
+      [username, hash, fullName, mobileNumber, position, status, base_lat, base_lng, allowed_radius_m, entry_time, exit_time]
     );
     res.json(rows[0]);
   } catch (err) {
@@ -98,20 +106,63 @@ exports.createUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
-  const { fullName, mobileNumber, position, status, password } = req.body;
+  const {
+    fullName, mobileNumber = null, position = null, status, password,
+    base_lat = null, base_lng = null, allowed_radius_m = null,
+    entry_time = '07:30', exit_time = '16:30'
+  } = req.body;
   try {
     if (password) {
       const hash = await bcrypt.hash(password, 12);
       await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, id]);
     }
     const { rows } = await pool.query(
-      `UPDATE users SET full_name = $1, mobile_number = $2, position = $3, status = $4, updated_at = NOW()
-       WHERE id = $5 RETURNING id, username, full_name, status`,
-      [fullName, mobileNumber, position, status, id]
+      `UPDATE users SET
+         full_name = $1, mobile_number = $2, position = $3, status = $4,
+         base_lat = $6, base_lng = $7, allowed_radius_m = $8,
+         entry_time = $9, exit_time = $10,
+         updated_at = NOW()
+       WHERE id = $5 RETURNING id, username, full_name, status, entry_time, exit_time`,
+      [fullName, mobileNumber, position, status, id, base_lat, base_lng, allowed_radius_m, entry_time, exit_time]
     );
     res.json(rows[0]);
   } catch (err) {
+    console.error('updateUser error:', err);
     res.status(500).json({ error: 'Error al actualizar usuario' });
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  const { id } = req.params;
+  // Prevent deleting yourself
+  if (String(req.user.id) === String(id)) {
+    return res.status(400).json({ error: 'No puedes eliminar tu propio usuario administrador.' });
+  }
+  try {
+    // Soft delete: mark as 'deleted' to preserve attendance history
+    const { rows } = await pool.query(
+      `UPDATE users SET status = 'deleted', updated_at = NOW() WHERE id = $1 AND role = 'technician' RETURNING id, username, full_name`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado o no es un técnico.' });
+    }
+    res.json({ message: `Colaborador "${rows[0].full_name}" eliminado correctamente.`, user: rows[0] });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Error al eliminar usuario' });
+  }
+};
+
+// === Reset User Devices ===
+exports.resetUserDevices = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rowCount } = await pool.query('DELETE FROM devices WHERE user_id = $1', [id]);
+    res.json({ message: `Se eliminaron ${rowCount} dispositivo(s) registrados. El colaborador podrá registrar un nuevo dispositivo en su próximo inicio de sesión.`, deleted: rowCount });
+  } catch (err) {
+    console.error('resetUserDevices error:', err);
+    res.status(500).json({ error: 'Error al resetear dispositivos del usuario' });
   }
 };
 

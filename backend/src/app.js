@@ -7,6 +7,10 @@ const path = require('path');
 const WebSocket = require('ws');
 const env = require('./config/env');
 const qrService = require('./services/qrService');
+const { runMigrations } = require('./config/migrate');
+
+// Run DB migrations on startup (idempotent — safe to run every time)
+runMigrations();
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -44,7 +48,8 @@ app.use(cors({
   credentials: true
 }));
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Start QR Rotation (async — catch errors so a slow DB cold-start doesn't crash the process)
 qrService.startRotationInterval().catch(err => {

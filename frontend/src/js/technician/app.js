@@ -25,6 +25,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initial loads
   await loadTodayHistory();
 
+  // Auto-start validation on login (once per session)
+  if (!sessionStorage.getItem('auto_attendance_marked')) {
+    sessionStorage.setItem('auto_attendance_marked', 'true');
+    startValidationFlow();
+  }
+
   // Event Listeners
   document.getElementById('logoutBtn').addEventListener('click', logout);
   

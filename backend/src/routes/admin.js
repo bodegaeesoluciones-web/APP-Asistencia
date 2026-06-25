@@ -12,6 +12,10 @@ router.get('/dashboard', adminController.getDashboard);
 router.get('/users', adminController.getUsers);
 router.post('/users', adminController.createUser);
 router.put('/users/:id', adminController.updateUser);
+router.delete('/users/:id', adminController.deleteUser);
+
+// Reset devices for a user
+router.delete('/users/:id/devices', adminController.resetUserDevices);
 
 // Devices
 router.get('/devices', adminController.getDevices);

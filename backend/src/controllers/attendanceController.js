@@ -16,11 +16,11 @@ exports.markAttendance = async (req, res) => {
   }
 
   try {
-    // 1. Fetch current settings for validation
+    // 1. Fetch current settings for validation (fallback)
     const settings = await getSettings();
-    const baseLat = parseFloat(settings.base_lat || '-12.0464');
-    const baseLng = parseFloat(settings.base_lng || '-77.0428');
-    const allowedRadius = parseInt(settings.allowed_radius_m || '50', 10);
+    const baseLat = user.base_lat !== null ? parseFloat(user.base_lat) : parseFloat(settings.base_lat || '-12.0464');
+    const baseLng = user.base_lng !== null ? parseFloat(user.base_lng) : parseFloat(settings.base_lng || '-77.0428');
+    const allowedRadius = user.allowed_radius_m !== null ? parseInt(user.allowed_radius_m, 10) : parseInt(settings.allowed_radius_m || '50', 10);
     const authorizedSsid = settings.authorized_ssid || 'EESOLUCIONES_BASE';
 
     let isValid = true;
