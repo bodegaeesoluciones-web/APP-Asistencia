@@ -62,27 +62,50 @@ function App() {
 
   const hasAttemptedAutoLogin = useRef(false);
 
-  // Check for saved encrypted credentials on mount
+  // Check for saved credentials on mount (standard tokens first, then encrypted fallback)
   useEffect(() => {
     if (!isAuthenticated && !hasAttemptedAutoLogin.current) {
-      const savedCreds = localStorage.getItem('techCredentials');
-      if (savedCreds) {
+      // First, try standard token storage (set by api.login)
+      const access = localStorage.getItem('access_token');
+      const refresh = localStorage.getItem('refresh_token');
+      const userInfo = localStorage.getItem('user_info');
+      const userId = localStorage.getItem('user_id');
+      if (access && refresh && userInfo) {
         try {
-          const bytes = CryptoJS.AES.decrypt(savedCreds, 'asisttrack_secure_key_2026');
-          const decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-          if (decryptedData && decryptedData.accessToken) {
-            api.saveSession(decryptedData);
-            // Ensure userId is set so _refresh() works correctly
-            if (decryptedData.user?.id) {
-              api.userId = String(decryptedData.user.id);
-              sessionStorage.setItem('user_id', api.userId);
-            }
-            setIsAuthenticated(true);
+          const session = {
+            accessToken: access,
+            refreshToken: refresh,
+            user: JSON.parse(userInfo),
+            userId: userId || undefined,
+          };
+          api.saveSession(session);
+          if (session.user?.id) {
+            api.userId = String(session.user.id);
+            sessionStorage.setItem('user_id', api.userId);
           }
+          setIsAuthenticated(true);
         } catch (e) {
-          console.error('Failed to decrypt local credentials', e);
-          // Clear corrupted credentials so they don't loop
-          localStorage.removeItem('techCredentials');
+          console.error('Error loading standard session data', e);
+        }
+      } else {
+        // Fallback to encrypted credentials (legacy)
+        const savedCreds = localStorage.getItem('techCredentials');
+        if (savedCreds) {
+          try {
+            const bytes = CryptoJS.AES.decrypt(savedCreds, 'asisttrack_secure_key_2026');
+            const decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+            if (decryptedData && decryptedData.accessToken) {
+              api.saveSession(decryptedData);
+              if (decryptedData.user?.id) {
+                api.userId = String(decryptedData.user.id);
+                sessionStorage.setItem('user_id', api.userId);
+              }
+              setIsAuthenticated(true);
+            }
+          } catch (e) {
+            console.error('Failed to decrypt local credentials', e);
+            localStorage.removeItem('techCredentials');
+          }
         }
       }
       hasAttemptedAutoLogin.current = true;

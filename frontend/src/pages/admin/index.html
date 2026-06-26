@@ -121,13 +121,17 @@
           </div>
         </div>
 
-        <!-- USERS VIEW -->
         <div id="view-users" class="view-section hidden">
           <div class="d-flex justify-content-between mb-3 align-items-center">
             <h3 class="m-0">Gestión de Técnicos</h3>
-            <button class="btn btn-primary" id="btnNewUser">
-              <i data-lucide="plus"></i> Nuevo Técnico
-            </button>
+            <div>
+              <button class="btn btn-danger mr-2" onclick="wipeDatabase()">
+                <i data-lucide="trash-2"></i> Limpiar Todo a Cero
+              </button>
+              <button class="btn btn-primary" id="btnNewUser">
+                <i data-lucide="plus"></i> Nuevo Técnico
+              </button>
+            </div>
           </div>
           
           <div class="card">
@@ -140,11 +144,12 @@
                     <th>Cargo</th>
                     <th>Móvil</th>
                     <th>Estado</th>
+                    <th>Rol</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="usersTableBody">
-                  <tr><td colspan="6" class="text-center">Cargando...</td></tr>
+                  <tr><td colspan="7" class="text-center">Cargando...</td></tr>
                 </tbody>
               </table>
             </div>

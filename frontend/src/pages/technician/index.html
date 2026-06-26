@@ -813,10 +813,15 @@
     }
     function clearAlert() { $('alertContainer').innerHTML = ''; }
 
+    // ── Configuration ──
+    const API_BASE = '/api';
+
     function getToken() { return localStorage.getItem('accessToken'); }
 
     async function apiFetch(path, opts = {}) {
-      const res = await fetch(path, {
+      // Allow overriding the default /api prefix with a custom API_BASE
+      const fetchPath = path.startsWith('/api') ? `${API_BASE}${path.substring(4)}` : path;
+      const res = await fetch(fetchPath, {
         ...opts,
         headers: {
           'Content-Type': 'application/json',

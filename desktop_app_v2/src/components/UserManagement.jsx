@@ -9,6 +9,7 @@ export default function UserManagement({ users, setUsers }) {
   const [resettingDevice, setResettingDevice] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // user to delete
 
+
   const filteredUsers = users.filter(u =>
     u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.username.toLowerCase().includes(searchTerm.toLowerCase())
@@ -102,17 +103,31 @@ export default function UserManagement({ users, setUsers }) {
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     setLoading(true);
-    const res = await api.deleteUser(deleteConfirm.id);
-    setLoading(false);
-    setDeleteConfirm(null);
-    setModalData(null);
-    if (res.success) {
-      const freshUsers = await api.getUsers();
-      setUsers(freshUsers);
-    } else {
-      alert('Error: ' + res.message);
+    try {
+      console.log('Attempting delete for user id:', deleteConfirm.id);
+      const res = await api.deleteUser(deleteConfirm.id);
+      console.log('Delete response:', res);
+      if (res.success) {
+        const freshUsers = await api.getUsers();
+        setUsers(freshUsers);
+        alert('Colaborador eliminado correctamente');
+      } else {
+        // Show detailed error if provided by backend
+        const detail = res.details ? ` Detalles: ${res.details}` : '';
+        const errMsg = res.error || res.message || 'Respuesta inesperada';
+        alert(`Error al eliminar: ${errMsg}.${detail}`);
+      }
+    } catch (e) {
+      console.error('Delete error:', e);
+      alert('Error inesperado al eliminar');
+    } finally {
+      setLoading(false);
+      setDeleteConfirm(null);
+      setModalData(null);
     }
   };
+
+
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -134,6 +149,7 @@ export default function UserManagement({ users, setUsers }) {
           <Plus size={18} />
           Nuevo Colaborador
         </button>
+
       </div>
 
       {/* Grid */}
@@ -391,6 +407,8 @@ export default function UserManagement({ users, setUsers }) {
           </div>
         </div>
       )}
+
+
 
     </div>
   );

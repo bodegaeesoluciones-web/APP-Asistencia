@@ -8,6 +8,7 @@
     "dev": "nodemon src/app.js",
     "build": "cd ../frontend && npm install && npm run build",
     "seed": "node seeds/seed.js",
+    "wipe": "node seeds/wipe.js",
     "migrate": "node migrations/run.js"
   },
   "dependencies": {

@@ -72,11 +72,11 @@ exports.getUsers = async (req, res) => {
               base_lat, base_lng, allowed_radius_m,
               entry_time, exit_time,
               created_at 
-       FROM users WHERE role = 'technician'
+       FROM users 
        ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-    const { rows: countRows } = await pool.query("SELECT count(*) FROM users WHERE role = 'technician'");
+    const { rows: countRows } = await pool.query("SELECT count(*) FROM users");
     res.json({ users: rows, total: parseInt(countRows[0].count, 10) });
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener usuarios' });
@@ -134,23 +134,48 @@ exports.updateUser = async (req, res) => {
 
 exports.deleteUser = async (req, res) => {
   const { id } = req.params;
+  // Verify auth
+  if (!req.user) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
   // Prevent deleting yourself
   if (String(req.user.id) === String(id)) {
     return res.status(400).json({ error: 'No puedes eliminar tu propio usuario administrador.' });
   }
   try {
-    // Soft delete: mark as 'deleted' to preserve attendance history
-    const { rows } = await pool.query(
-      `UPDATE users SET status = 'deleted', updated_at = NOW() WHERE id = $1 AND role = 'technician' RETURNING id, username, full_name`,
-      [id]
-    );
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado o no es un técnico.' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Nullify authorized_by if the user is an admin who authorized devices
+      await client.query('UPDATE devices SET authorized_by = NULL WHERE authorized_by = $1', [id]);
+      
+      // Delete dependent records manually to avoid cascade FK conflicts
+      await client.query('DELETE FROM attendance WHERE user_id = $1', [id]);
+      await client.query('DELETE FROM devices WHERE user_id = $1', [id]);
+      await client.query('DELETE FROM refresh_tokens WHERE user_id = $1', [id]);
+      await client.query('DELETE FROM audit_log WHERE user_id = $1', [id]);
+      
+      const { rows } = await client.query(
+        `DELETE FROM users WHERE id = $1 RETURNING id, username, full_name`,
+        [id]
+      );
+      
+      await client.query('COMMIT');
+      
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado o no es un técnico.' });
+      }
+      res.json({ message: `Colaborador "${rows[0].full_name}" eliminado correctamente.`, user: rows[0] });
+    } catch (dbErr) {
+      await client.query('ROLLBACK');
+      throw dbErr;
+    } finally {
+      client.release();
     }
-    res.json({ message: `Colaborador "${rows[0].full_name}" eliminado correctamente.`, user: rows[0] });
   } catch (err) {
     console.error('Delete user error:', err);
-    res.status(500).json({ error: 'Error al eliminar usuario' });
+    res.status(500).json({ error: 'Error al eliminar usuario', details: err.message });
   }
 };
 

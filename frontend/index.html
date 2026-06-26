@@ -453,12 +453,20 @@
       }
     }
 
+    // ── Configuration ──
+    // If frontend and backend are hosted separately on Render, change API_BASE to the backend URL.
+    // Example: const API_BASE = 'https://my-backend.onrender.com/api';
+    const API_BASE = '/api';
+
     // ── Already logged in ──
     const token = localStorage.getItem('accessToken');
     const role  = localStorage.getItem('userRole');
     if (token && role) {
       if (role !== 'admin') {
-        window.location.href = '/src/pages/technician/index.html';
+        // Prevent infinite reload if server incorrectly returns index.html for technician path
+        if (!window.location.pathname.includes('/technician/')) {
+          window.location.href = '/src/pages/technician/index.html';
+        }
       } else {
         localStorage.clear();
       }
@@ -480,7 +488,7 @@
       setLoading(true);
 
       try {
-        const resp = await fetch('/api/auth/login', {
+        const resp = await fetch(`${API_BASE}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

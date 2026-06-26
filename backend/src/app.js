@@ -63,6 +63,20 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/reports', reportsRoutes);
 
+// EMERGENCY WIPE ROUTE
+app.get('/api/wipe-db', async (req, res) => {
+  const { pool } = require('./config/db');
+  const bcrypt = require('bcryptjs');
+  try {
+    await pool.query('TRUNCATE TABLE users, devices, attendance, qr_tokens, refresh_tokens, audit_log RESTART IDENTITY CASCADE');
+    const hash = await bcrypt.hash('Admin123!', 12);
+    await pool.query("INSERT INTO users (username, password_hash, full_name, role, status) VALUES ($1, $2, $3, 'admin', 'active')", ['admin', hash, 'Administrador del Sistema']);
+    res.send('<h1>✅ Base de datos limpiada correctamente.</h1><p>Se ha restablecido el usuario admin. Ya puedes cerrar esta ventana.</p>');
+  } catch (err) {
+    res.status(500).send(`<h1>❌ Error al limpiar base de datos</h1><pre>${err.message}</pre>`);
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });

@@ -179,12 +179,12 @@ function animateCounter(id, target) {
 async function loadUsers() {
   const tbody = document.getElementById('usersTableBody');
   if (!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="6" class="text-center"><span class="spinner spinner-sm"></span> Cargando...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7" class="text-center"><span class="spinner spinner-sm"></span> Cargando...</td></tr>`;
 
   try {
     const data = await api.get('/admin/users');
     if (!data.users || data.users.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No hay técnicos registrados</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">No hay técnicos registrados</td></tr>`;
       return;
     }
 
@@ -195,13 +195,22 @@ async function loadUsers() {
         <td>${escHtml(u.position || '—')}</td>
         <td>${escHtml(u.mobile_number || '—')}</td>
         <td>
-          <span class="badge ${u.status === 'active' ? 'bg-success' : 'bg-secondary'}">
-            ${u.status === 'active' ? 'Activo' : 'Inactivo'}
+          <span class="badge ${u.status === 'active' ? 'bg-success' : (u.status === 'deleted' ? 'bg-danger' : 'bg-secondary')}">
+            ${u.status === 'active' ? 'Activo' : (u.status === 'deleted' ? 'Eliminado' : 'Inactivo')}
           </span>
+        </td>
+        <td>
+          <span class="badge bg-info">${u.role === 'admin' ? 'Admin' : 'Técnico'}</span>
         </td>
         <td>
           <button class="btn btn-sm btn-outline-primary mr-1" onclick="openEditUser('${u.id}', '${escHtml(u.username)}', '${escHtml(u.full_name)}', '${escHtml(u.mobile_number || '')}', '${escHtml(u.position || '')}', '${u.status}')">
             Editar
+          </button>
+          <button class="btn btn-sm btn-outline-warning mr-1" onclick="resetUserDevice('${u.id}', '${escHtml(u.full_name)}')">
+            Reset
+          </button>
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteUser('${u.id}', '${escHtml(u.full_name)}')">
+            Eliminar
           </button>
         </td>
       </tr>
@@ -309,6 +318,49 @@ async function saveUser() {
     btnSave.disabled = false;
   }
 }
+
+// ─────────────────────────────────────────────
+// RESET USER DEVICE
+// ─────────────────────────────────────────────
+window.resetUserDevice = async function(id, userName) {
+  if (!confirm(`¿Estás seguro de resetear el dispositivo del técnico ${userName}? Esto permitirá que se registre desde un nuevo dispositivo.`)) return;
+
+  try {
+    await api.delete(`/admin/users/${id}/devices`);
+    alert(`✅ Dispositivo de ${userName} reseteado correctamente.`);
+  } catch (err) {
+    alert(err.message || 'Error al resetear dispositivo del usuario');
+  }
+};
+
+// ─────────────────────────────────────────────
+// DELETE USER
+// ─────────────────────────────────────────────
+window.deleteUser = async function(id, userName) {
+  if (!confirm(`¿Estás seguro de ELIMINAR permanentemente al técnico ${userName}? Esta acción no se puede deshacer.`)) return;
+
+  try {
+    await api.delete(`/admin/users/${id}`);
+    alert(`✅ Técnico ${userName} eliminado correctamente.`);
+    await loadUsers();
+  } catch (err) {
+    alert(err.message || 'Error al eliminar el usuario');
+  }
+};
+
+window.wipeDatabase = async function() {
+  if (!confirm(`⚠️ ¡ALERTA MÁXIMA!\n\nEstás a punto de borrar TODA la base de datos (técnicos, dispositivos, historial, asistencias).\nTodo quedará en cero.\n\n¿Estás 100% seguro de querer continuar?`)) return;
+  if (!confirm(`Última confirmación: ¿Borrar la base de datos completa?`)) return;
+
+  try {
+    const res = await fetch('/api/wipe-db');
+    if (!res.ok) throw new Error('Falló al contactar al servidor');
+    alert(`✅ ¡Base de datos limpiada correctamente! El usuario admin fue restablecido.\n\nEl sistema se reiniciará para aplicar los cambios.`);
+    window.location.reload();
+  } catch (err) {
+    alert(`❌ Error al limpiar la base de datos: ${err.message}`);
+  }
+};
 
 // ─────────────────────────────────────────────
 // HISTORY

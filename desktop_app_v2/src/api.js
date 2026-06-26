@@ -9,10 +9,13 @@ if (!deviceId) {
 
 class APIClient {
   constructor() {
-    this.accessToken = sessionStorage.getItem('access_token');
-    this.refreshToken = sessionStorage.getItem('refresh_token');
-    this.userId = sessionStorage.getItem('user_id');
-    this.user = JSON.parse(sessionStorage.getItem('user_info') || 'null');
+    // Primero buscamos en localStorage (sobrevive a recargas)
+    // Si no está, fallback a sessionStorage (compatibilidad legacy)
+    const ls = localStorage;
+    this.accessToken = ls.getItem('access_token') || sessionStorage.getItem('access_token');
+    this.refreshToken = ls.getItem('refresh_token') || sessionStorage.getItem('refresh_token');
+    this.userId = ls.getItem('user_id') || sessionStorage.getItem('user_id');
+    this.user = JSON.parse(ls.getItem('user_info') || sessionStorage.getItem('user_info') || 'null');
     this.refreshPromise = null;
   }
 
@@ -22,9 +25,16 @@ class APIClient {
     this.user = data.user || this.user;
     // Keep userId separately so refresh token calls always have it
     this.userId = this.user?.id ? String(this.user.id) : this.userId;
+    // Guardar tokens y user_id persistentes
+    const ls = localStorage;
+    ls.setItem('access_token', this.accessToken);
+    ls.setItem('refresh_token', this.refreshToken);
+    if (this.userId) ls.setItem('user_id', this.userId);
+    ls.setItem('user_info', JSON.stringify(this.user));
+    // Compatibilidad legacy
     sessionStorage.setItem('access_token', this.accessToken);
     sessionStorage.setItem('refresh_token', this.refreshToken);
-    sessionStorage.setItem('user_id', this.userId || '');
+    if (this.userId) sessionStorage.setItem('user_id', this.userId);
     sessionStorage.setItem('user_info', JSON.stringify(this.user));
   }
 
@@ -33,11 +43,18 @@ class APIClient {
     this.refreshToken = null;
     this.userId = null;
     this.user = null;
+    // Eliminar de ambos almacenes
+    const ls = localStorage;
+    ls.removeItem('access_token');
+    ls.removeItem('refresh_token');
+    ls.removeItem('user_id');
+    ls.removeItem('user_info');
+    // Compatibilidad legacy
     sessionStorage.removeItem('access_token');
     sessionStorage.removeItem('refresh_token');
     sessionStorage.removeItem('user_id');
     sessionStorage.removeItem('user_info');
-    // We do NOT clear localStorage('techCredentials') here, because that's permanent.
+    // No borramos techCredentials, sigue siendo permanente
   }
 
   getHeaders() {
@@ -75,7 +92,7 @@ class APIClient {
   async _refresh() {
     // Need both refreshToken and userId to call the backend
     if (!this.refreshToken || !this.userId) return false;
-    
+
     // If a refresh is already in progress, wait for it instead of making a duplicate request
     if (this.refreshPromise) {
       return await this.refreshPromise;
@@ -88,10 +105,10 @@ class APIClient {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken: this.refreshToken, userId: this.userId })
         });
-        if (res.ok) {
-          const data = await res.json();
-          this.accessToken = data.accessToken || data.access_token;
-          sessionStorage.setItem('access_token', this.accessToken);
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (data.accessToken || data.access_token) {
+          this.saveSession(data);
           return true;
         }
         return false;
@@ -186,11 +203,17 @@ class APIClient {
       const data = await res.json();
       return { success: true, data };
     }
+    // Try to extract error details from JSON response
     try {
       const err = await res.json();
-      return { success: false, message: err.error || 'Error eliminando usuario' };
+      return {
+        success: false,
+        message: err.error || err.message || 'Error eliminando usuario',
+        details: err.details,
+      };
     } catch {
-      return { success: false, message: 'El servidor rechazó la solicitud (¿Endpoint no existe?)' };
+      // Non‑JSON or network error fallback
+      return { success: false, message: 'Error al comunicarse con el servidor' };
     }
   }
 
@@ -252,6 +275,17 @@ class APIClient {
       return true;
     }
     return false;
+  }
+  async wipeDatabase() {
+    // wipe-db is outside /api prefix
+    const BASE = API_BASE.replace('/api', '');
+    try {
+      const res = await fetch(`${BASE}/api/wipe-db`, { headers: this.getHeaders() });
+      if (res.ok) return { success: true };
+      return { success: false, message: 'Error al limpiar la base de datos' };
+    } catch (e) {
+      return { success: false, message: 'Error de red: ' + e.message };
+    }
   }
 }
 
