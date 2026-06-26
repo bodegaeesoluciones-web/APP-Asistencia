@@ -149,6 +149,7 @@ exports.deleteUser = async (req, res) => {
       
       // Nullify authorized_by if the user is an admin who authorized devices
       await client.query('UPDATE devices SET authorized_by = NULL WHERE authorized_by = $1', [id]);
+      await client.query('UPDATE settings SET updated_by = NULL WHERE updated_by = $1', [id]);
       
       // Delete dependent records manually to avoid cascade FK conflicts
       await client.query('DELETE FROM attendance WHERE user_id = $1', [id]);
