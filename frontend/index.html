@@ -453,6 +453,9 @@
       }
     }
 
+    // ── URL base de la API ──
+    const API_BASE = '/api';
+
     // ── Login submit ──
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -509,7 +512,8 @@
         window.location.href = '/src/pages/technician/index.html';
 
       } catch (err) {
-        showAlert('Error de conexión. Verifica que el servidor esté disponible.');
+        console.error('Login error:', err);
+        showAlert(`Error de conexión: ${err.message}. Verifica que el servidor esté disponible.`);
       } finally {
         setLoading(false);
       }
