@@ -453,6 +453,25 @@
       }
     }
 
+    // ── Configuration ──
+    // If frontend and backend are hosted separately on Render, change API_BASE to the backend URL.
+    // Example: const API_BASE = 'https://my-backend.onrender.com/api';
+    const API_BASE = '/api';
+
+    // ── Already logged in ──
+    const token = localStorage.getItem('accessToken');
+    const role  = localStorage.getItem('userRole');
+    if (token && role) {
+      if (role !== 'admin') {
+        // Prevent infinite reload if server incorrectly returns index.html for technician path
+        if (!window.location.pathname.includes('/technician/')) {
+          window.location.href = '/src/pages/technician/index.html';
+        }
+      } else {
+        localStorage.clear();
+      }
+    }
+
     // ── Login submit ──
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -491,13 +510,13 @@
           return;
         }
 
-        // Admins solo pueden usar la aplicación de escritorio
+        // Admins can only use the desktop app
         if (data.user.role === 'admin') {
-          showAlert('El acceso de administrador es exclusivo de la aplicación de escritorio.', 'warning');
+          showAlert('El panel de administración solo está disponible desde la aplicación de escritorio.', 'warning');
           return;
         }
 
-        // Guardar sesión y redirigir
+        // Store session
         localStorage.setItem('accessToken',  data.accessToken);
         localStorage.setItem('refreshToken', data.refreshToken);
         localStorage.setItem('userId',   data.user.id);

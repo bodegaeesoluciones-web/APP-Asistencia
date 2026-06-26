@@ -86,8 +86,15 @@ app.get('/health', (req, res) => {
 const frontendPath = path.join(__dirname, '../../frontend/dist');
 app.use(express.static(frontendPath));
 
-// Catch-all: cualquier ruta no-API devuelve el index.html del frontend
+// Catch-all: sirve el archivo HTML específico si existe, si no devuelve el login (index.html)
 app.get('*', (req, res) => {
+  const fs = require('fs');
+  // If the request looks like it's for an HTML page inside dist, try to serve it directly
+  const requestedFile = path.join(frontendPath, req.path);
+  if (req.path.endsWith('.html') && fs.existsSync(requestedFile)) {
+    return res.sendFile(requestedFile);
+  }
+  // Default fallback: login page
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
