@@ -453,20 +453,8 @@
       }
     }
 
-    // ── Configuration ──
-    // If frontend and backend are hosted separately on Render, change API_BASE to the backend URL.
-    // Example: const API_BASE = 'https://my-backend.onrender.com/api';
-    const API_BASE = '/api';
-
-    // ── Already logged in ──
-    const token = localStorage.getItem('accessToken');
-    const role  = localStorage.getItem('userRole');
-    if (token && role) {
-      // Redirect any logged-in user (admin or technician) to the portal
-      if (!window.location.pathname.includes('/technician/')) {
-        window.location.href = '/src/pages/technician/index.html';
-      }
-    }
+    // ── Limpiar sesión al entrar al login (siempre debe autenticarse) ──
+    localStorage.clear();
 
     // ── Login submit ──
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -506,8 +494,13 @@
           return;
         }
 
+        // Admins solo pueden usar la aplicación de escritorio
+        if (data.user.role === 'admin') {
+          showAlert('El acceso de administrador es exclusivo de la aplicación de escritorio.', 'warning');
+          return;
+        }
 
-        // Store session
+        // Guardar sesión y redirigir
         localStorage.setItem('accessToken',  data.accessToken);
         localStorage.setItem('refreshToken', data.refreshToken);
         localStorage.setItem('userId',   data.user.id);
