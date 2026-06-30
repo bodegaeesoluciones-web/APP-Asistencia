@@ -4,7 +4,7 @@ const { pool } = require('../config/db');
 const { haversineDistance } = require('../utils/haversine');
 const { getSettings } = require('../services/settingsService');
 const { logAudit } = require('../utils/audit');
-const cloudinaryService = require('../services/cloudinaryService');
+const imgurService = require('../services/imgurService');
 
 exports.markAttendance = async (req, res) => {
   const { latitude, longitude, gpsAccuracy, wifiSsid, photoBase64 } = req.body;
@@ -44,16 +44,16 @@ exports.markAttendance = async (req, res) => {
     
     const type = currentHour < 12 ? 'entry' : 'exit';
 
-    // 5. Upload photo to Cloudinary (non-blocking: failure won't block attendance record)
+    // 5. Upload photo to Imgur (non-blocking: failure won't block attendance record)
     let photoUrl = null;
     let photoStatus = 'no_photo';
 
     if (photoBase64) {
       try {
-        photoUrl = await cloudinaryService.uploadPhoto(photoBase64, user.username, type);
+        photoUrl = await imgurService.uploadPhoto(photoBase64, user.username, type);
         photoStatus = 'uploaded';
       } catch (photoErr) {
-        console.error('Cloudinary upload error (non-fatal):', photoErr.message);
+        console.error('Imgur upload error (non-fatal):', photoErr.message);
         photoStatus = 'upload_failed';
       }
     }
