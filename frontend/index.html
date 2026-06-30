@@ -434,6 +434,8 @@
           <span>${icons[type] || '⚠️'}</span>
           <span>${msg}</span>
         </div>`;
+      // Forzar alerta nativa por si hay un fallo de CSS
+      alert(msg);
     }
     function clearAlert() { document.getElementById('alertContainer').innerHTML = ''; }
 
