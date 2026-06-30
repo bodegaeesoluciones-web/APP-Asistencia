@@ -816,7 +816,7 @@
     // ── Configuration ──
     const API_BASE = '/api';
 
-    function getToken() { return localStorage.getItem('accessToken'); }
+    function getToken() { return localStorage.getItem('access_token'); }
 
     async function apiFetch(path, opts = {}) {
       // Allow overriding the default /api prefix with a custom API_BASE
@@ -840,7 +840,14 @@
     // ─────────────────────────────────────────────────
     // AUTH CHECK
     // ─────────────────────────────────────────────────
-    const userName = localStorage.getItem('userName') || 'Técnico';
+    const userStr = localStorage.getItem('user');
+    let userName = 'Técnico';
+    if (userStr) {
+      try {
+        const u = JSON.parse(userStr);
+        userName = u.fullName || u.full_name || u.username || 'Técnico';
+      } catch(e) {}
+    }
     const accessToken = getToken();
     if (!accessToken) { window.location.href = '/'; }
 

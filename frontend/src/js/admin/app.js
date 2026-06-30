@@ -458,7 +458,7 @@ function downloadReport(type) {
   if (endDate) params.set('endDate', endDate);
   if (status) params.set('status', status);
 
-  const token = localStorage.getItem('accessToken');
+  const token = localStorage.getItem('access_token');
   const endpoint = type === 'excel' ? '/reports/export/excel' : '/reports/export/pdf';
   const url = `${endpoint}?${params.toString()}`;
 

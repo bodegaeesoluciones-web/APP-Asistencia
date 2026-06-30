@@ -500,13 +500,11 @@
           return;
         }
 
-        // Guardar sesión y redirigir
-        localStorage.setItem('accessToken',  data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
-        localStorage.setItem('userId',   data.user.id);
-        localStorage.setItem('userRole', data.user.role);
-        localStorage.setItem('userName', data.user.fullName || data.user.full_name || username);
-        localStorage.setItem('deviceFingerprint', deviceFingerprint);
+        // Guardar sesión y redirigir (usando las mismas keys que espera auth.js)
+        localStorage.setItem('access_token',  data.accessToken);
+        localStorage.setItem('refresh_token', data.refreshToken);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('device_fingerprint', deviceFingerprint);
 
         // Redirect
         window.location.href = '/src/pages/technician/index.html';
