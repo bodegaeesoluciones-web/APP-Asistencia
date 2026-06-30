@@ -1,4 +1,4 @@
-const xlsx = require('xlsx');
+const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 const { pool } = require('../config/db');
 const { getSettings } = require('../services/settingsService');
@@ -64,32 +64,93 @@ exports.exportExcel = async (req, res) => {
   try {
     const records = await getFilteredAttendance(req);
     
-    const data = records.map(r => ({
-      Fecha: new Date(r.local_time).toLocaleDateString(),
-      Hora: new Date(r.local_time).toLocaleTimeString(),
-      Técnico: r.user_name,
-      Cédula: r.cedula || '-',
-      Cargo: r.user_position || '-',
-      Móvil: r.mobile_number,
-      Tipo: r.type === 'entry' ? 'Entrada' : 'Salida',
-      Estado: r.is_valid ? 'Válido' : 'Rechazado',
-      Motivo_Rechazo: r.rejection_reason || '-',
-      Dispositivo: r.device_name || '-',
-      Latitud: r.latitude,
-      Longitud: r.longitude,
-      Dirección_IP: r.ip_address || '-',
-      Evidencia: r.photo_url || '-'
-    }));
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Asistencia', {
+      views: [{ state: 'frozen', ySplit: 1 }] // Congelar la primera fila (cabeceras)
+    });
 
-    const ws = xlsx.utils.json_to_sheet(data);
-    const wb = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(wb, ws, 'Asistencia');
+    // Definir columnas y anchos
+    worksheet.columns = [
+      { header: 'Fecha', key: 'fecha', width: 14 },
+      { header: 'Hora', key: 'hora', width: 12 },
+      { header: 'Colaborador', key: 'nombre', width: 35 },
+      { header: 'Cédula', key: 'cedula', width: 15 },
+      { header: 'Cargo', key: 'cargo', width: 25 },
+      { header: 'Tipo', key: 'tipo', width: 15 },
+      { header: 'Estado', key: 'estado', width: 25 },
+      { header: 'Móvil', key: 'movil', width: 15 },
+      { header: 'Dispositivo', key: 'dispositivo', width: 30 },
+      { header: 'Latitud', key: 'lat', width: 15 },
+      { header: 'Longitud', key: 'lng', width: 15 },
+      { header: 'IP', key: 'ip', width: 18 },
+      { header: 'Evidencia', key: 'evidencia', width: 20 }
+    ];
 
-    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    // Estilizar las cabeceras (Fila 1)
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // Letra blanca
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF2563EB' } // Fondo azul profesional
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 30;
 
-    res.setHeader('Content-Disposition', 'attachment; filename="reporte_asistencia.xlsx"');
+    // Llenar datos y estilizar filas
+    records.forEach((r, index) => {
+      const isEntry = r.type === 'entry';
+      const isValid = r.is_valid;
+      
+      const row = worksheet.addRow({
+        fecha: new Date(r.local_time).toLocaleDateString('es-ES'),
+        hora: new Date(r.local_time).toLocaleTimeString('es-ES'),
+        nombre: r.user_name,
+        cedula: r.cedula || '-',
+        cargo: r.user_position || '-',
+        tipo: isEntry ? 'ENTRADA' : 'SALIDA',
+        estado: isValid ? 'Válido' : (r.rejection_reason || 'Rechazado'),
+        movil: r.mobile_number || '-',
+        dispositivo: r.device_name || '-',
+        lat: r.latitude || '-',
+        lng: r.longitude || '-',
+        ip: r.ip_address || '-',
+        evidencia: r.photo_url && r.photo_url !== '-' ? { text: '📷 Ver Foto', hyperlink: r.photo_url } : '-'
+      });
+
+      // Altura de fila
+      row.height = 25;
+      row.alignment = { vertical: 'middle', horizontal: 'center' };
+      
+      // Alinear nombres a la izquierda
+      row.getCell('nombre').alignment = { vertical: 'middle', horizontal: 'left' };
+      row.getCell('cargo').alignment = { vertical: 'middle', horizontal: 'left' };
+
+      // Filas alternas (zebra striping) para fácil lectura
+      if (index % 2 === 0) {
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } }; // Gris clarito
+      }
+
+      // Colores de Tipo
+      const tipoCell = row.getCell('tipo');
+      tipoCell.font = { bold: true, color: { argb: isEntry ? 'FF10B981' : 'FFF59E0B' } }; // Verde o Naranja
+
+      // Colores de Estado
+      const estadoCell = row.getCell('estado');
+      estadoCell.font = { bold: true, color: { argb: isValid ? 'FF10B981' : 'FFEF4444' } }; // Verde o Rojo
+      
+      // Estilo de Enlace de Evidencia
+      const evidenciaCell = row.getCell('evidencia');
+      if (r.photo_url && r.photo_url !== '-') {
+        evidenciaCell.font = { color: { argb: 'FF2563EB' }, underline: true, bold: true };
+      }
+    });
+
+    res.setHeader('Content-Disposition', 'attachment; filename="Reporte_Asistencia.xlsx"');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buffer);
+    
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (err) {
     console.error('Excel export error:', err);
     res.status(500).json({ error: 'Error al generar Excel' });
