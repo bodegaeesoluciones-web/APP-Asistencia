@@ -938,15 +938,28 @@
         label.textContent = 'Sin registros hoy';
         hint.textContent = 'Presiona el botón para registrar tu entrada';
       } else {
+        // next === 'exit'  → entrada ya fue marcada, ahora toca salida
+        // next === 'entry' → salida ya fue marcada (o es mañana temprano, no hay nada aún)
         const last = records[records.length - 1];
         if (next === 'exit') {
+          // La última acción fue entrada, el siguiente paso es marcar salida
+          const entryRecord = [...records].reverse().find(r => r.type === 'entry' && r.is_valid);
+          const entryTime = entryRecord ? new Date(entryRecord.timestamp).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' }) : new Date(last.timestamp).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
           icon.textContent = '✅'; icon.className = 'status-icon entry';
           label.textContent = 'Entrada registrada';
-          hint.textContent = `Ingresaste a las ${new Date(last.timestamp).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' })}`;
-        } else {
+          hint.textContent = `Ingresaste a las ${entryTime}. Recuerda marcar salida.`;
+        } else if (records.some(r => r.type === 'exit' && r.is_valid)) {
+          // Hay salida registrada válida
+          const exitRecord = [...records].reverse().find(r => r.type === 'exit' && r.is_valid);
+          const exitTime = exitRecord ? new Date(exitRecord.timestamp).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' }) : '';
           icon.textContent = '🏁'; icon.className = 'status-icon exit';
           label.textContent = 'Salida registrada';
-          hint.textContent = `Saliste a las ${new Date(last.timestamp).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' })}`;
+          hint.textContent = `Saliste a las ${exitTime}`;
+        } else {
+          // Solo hay registros inválidos o el estado no es claro
+          icon.textContent = '⚠️'; icon.className = 'status-icon pending';
+          label.textContent = 'Estado pendiente';
+          hint.textContent = 'Verifica tus registros del día';
         }
       }
 
@@ -1179,8 +1192,8 @@
       `;
 
       card.classList.add('visible');
-      // Auto-hide after 10 s
-      setTimeout(() => card.classList.remove('visible'), 10000);
+      // El card de confirmación permanece visible hasta que el usuario
+      // realice otra acción (la próxima llamada a renderStatus lo reemplazará).
     }
   </script>
 </body>
