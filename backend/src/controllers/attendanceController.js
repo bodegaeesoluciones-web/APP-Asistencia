@@ -4,7 +4,7 @@ const { pool } = require('../config/db');
 const { haversineDistance } = require('../utils/haversine');
 const { getSettings } = require('../services/settingsService');
 const { logAudit } = require('../utils/audit');
-const dropboxService = require('../services/dropboxService');
+const cloudinaryService = require('../services/cloudinaryService');
 
 exports.markAttendance = async (req, res) => {
   const { latitude, longitude, gpsAccuracy, wifiSsid, photoBase64 } = req.body;
@@ -44,16 +44,16 @@ exports.markAttendance = async (req, res) => {
     
     const type = currentHour < 12 ? 'entry' : 'exit';
 
-    // 5. Upload photo to Dropbox (non-blocking: failure won't block attendance record)
+    // 5. Upload photo to Cloudinary (non-blocking: failure won't block attendance record)
     let photoUrl = null;
     let photoStatus = 'no_photo';
 
     if (photoBase64) {
       try {
-        photoUrl = await dropboxService.uploadPhoto(photoBase64, user.username, type);
+        photoUrl = await cloudinaryService.uploadPhoto(photoBase64, user.username, type);
         photoStatus = 'uploaded';
       } catch (photoErr) {
-        console.error('Dropbox upload error (non-fatal):', photoErr.message);
+        console.error('Cloudinary upload error (non-fatal):', photoErr.message);
         photoStatus = 'upload_failed';
       }
     }
