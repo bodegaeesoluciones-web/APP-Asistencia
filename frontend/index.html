@@ -324,7 +324,7 @@
       <div id="alertContainer"></div>
 
       <!-- Form -->
-      <form id="loginForm" autocomplete="off" novalidate>
+      <form id="loginForm" autocomplete="off" novalidate action="javascript:void(0)">
 
         <div class="form-group">
           <label class="form-label" for="username">Usuario</label>
@@ -388,6 +388,15 @@
   </div>
 
   <script>
+    // ── Capturar errores JS globales ──
+    window.onerror = function(msg, src, line, col, err) {
+      alert('ERROR JS en línea ' + line + ': ' + msg);
+      return false;
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOM listo. loginForm:', document.getElementById('loginForm'));
+    });
     // ── Toggle password visibility ──
     document.getElementById('togglePw').addEventListener('click', () => {
       const pw = document.getElementById('password');
