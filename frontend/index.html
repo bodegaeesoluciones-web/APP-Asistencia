@@ -483,6 +483,8 @@
       setLoading(true);
 
       try {
+        console.log('Enviando login con', username);
+        alert('Enviando login...');
         const resp = await fetch(`${API_BASE}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -493,7 +495,8 @@
             deviceName: navigator.userAgent.substring(0, 100),
           }),
         });
-
+        console.log('Respuesta recibida', resp);
+        alert('Respuesta recibida, status '+resp.status);
         const data = await resp.json();
 
         if (!resp.ok) {
