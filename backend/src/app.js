@@ -42,7 +42,7 @@ wss.on('connection', (ws) => {
 });
 
 // Middleware
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({
   origin: env.ALLOWED_ORIGINS,
   credentials: true
