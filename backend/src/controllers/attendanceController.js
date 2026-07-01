@@ -109,6 +109,7 @@ exports.markAttendance = async (req, res) => {
         reasons: rejectionReasons,
         recordId: newRecord[0].id,
         type,
+        distance: Math.round(distance),
         timestamp: new Date(),
         photoStatus,
         photoUrl,
