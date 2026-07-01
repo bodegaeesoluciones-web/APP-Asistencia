@@ -1139,13 +1139,15 @@
         closeCameraModal();
 
         if (!res.ok) {
-          // Still show what went wrong but don't block the user
+          // Marcación inválida — mostrar tarjeta de advertencia con motivo
           const reasons = data.reasons ? data.reasons.join('. ') : data.error;
-          showAlert(`Marcación registrada con advertencia: ${reasons}`, 'warning');
+          showAlert(`⚠️ Marcación registrada pero inválida: ${reasons}`, 'warning');
+          showConfirmCard(data, true); // true = inválida
+        } else {
+          // Marcación exitosa
+          showConfirmCard(data, false);
         }
 
-        // Show success card
-        showConfirmCard(data);
         // Refresh history
         await loadTodayStatus();
         // Re-request GPS for next attempt
@@ -1157,14 +1159,27 @@
       }
     });
 
-    function showConfirmCard(data) {
+    function showConfirmCard(data, isInvalid = false) {
       const card = $('confirmCard');
       const typeLabel = data.type === 'entry' ? 'Entrada' : 'Salida';
-      const typeEmoji = data.type === 'entry' ? '🟢' : '🟡';
       const now = data.timestamp ? new Date(data.timestamp) : new Date();
 
-      $('confirmTitle').textContent = `${typeEmoji} ${typeLabel} Registrada`;
-      $('confirmSubtitle').textContent = 'Marcación completada exitosamente';
+      if (isInvalid) {
+        // Estado inválido / rechazado
+        $('confirmTitle').textContent = `⚠️ Marcación Rechazada`;
+        $('confirmTitle').style.color = '#f59e0b';
+        $('confirmSubtitle').textContent = data.reasons
+          ? data.reasons.join('. ')
+          : 'Tu ubicación está fuera del rango permitido.';
+        $('confirmSubtitle').style.color = '#f87171';
+      } else {
+        // Estado exitoso
+        const typeEmoji = data.type === 'entry' ? '🟢' : '🟡';
+        $('confirmTitle').textContent = `${typeEmoji} ${typeLabel} Registrada`;
+        $('confirmTitle').style.color = '';
+        $('confirmSubtitle').textContent = 'Marcación completada exitosamente';
+        $('confirmSubtitle').style.color = '';
+      }
 
       const photoStatus = {
         uploaded: '📷 Evidencia subida',
@@ -1192,8 +1207,6 @@
       `;
 
       card.classList.add('visible');
-      // El card de confirmación permanece visible hasta que el usuario
-      // realice otra acción (la próxima llamada a renderStatus lo reemplazará).
     }
   </script>
 </body>
