@@ -106,6 +106,10 @@ exports.markAttendance = async (req, res) => {
         error: 'Validación fallida',
         reasons: rejectionReasons,
         recordId: newRecord[0].id,
+        type,
+        timestamp: new Date(),
+        photoStatus,
+        photoUrl,
       });
     }
 
