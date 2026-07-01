@@ -36,10 +36,12 @@ exports.markAttendance = async (req, res) => {
     // 3. WiFi validation REMOVED — no longer required
     // (WiFi SSID is still saved to DB if sent, but it does not affect validity)
 
-    // 4. Determine if entry or exit based on today's existing records
+    // 4. Determine if entry or exit based on today's VALID records only
     const { rows: todayRecords } = await pool.query(
       `SELECT type FROM attendance
-       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = DATE(NOW() AT TIME ZONE $2)`,
+       WHERE user_id = $1
+         AND DATE(timestamp AT TIME ZONE $2) = DATE(NOW() AT TIME ZONE $2)
+         AND is_valid = true`,
       [user.id, settings.timezone || 'America/Lima']
     );
 
@@ -139,9 +141,9 @@ exports.getTodayAttendance = async (req, res) => {
       [req.user.id, settings.timezone || 'America/Lima']
     );
 
-    // Derive next expected action based on today's records
-    const hasEntry = rows.some(r => r.type === 'entry');
-    const hasExit = rows.some(r => r.type === 'exit');
+    // Derive next expected action based on today's VALID records only
+    const hasEntry = rows.some(r => r.type === 'entry' && r.is_valid);
+    const hasExit  = rows.some(r => r.type === 'exit'  && r.is_valid);
     let nextAction = 'entry';
     if (hasEntry && !hasExit) {
       nextAction = 'exit';
