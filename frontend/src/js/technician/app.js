@@ -31,6 +31,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     startValidationFlow();
   }
 
+  // --- AUTO-LOGOUT POR INACTIVIDAD (30 SEGUNDOS) ---
+  let inactivityTimer;
+  function resetInactivityTimer() {
+    clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      logout(); // Cierra sesión si no toca la pantalla en 30s
+    }, 30000);
+  }
+
+  // Detectar cualquier interacción para reiniciar el tiempo
+  ['touchstart', 'click', 'keypress', 'scroll', 'mousemove'].forEach(evt => {
+    document.addEventListener(evt, resetInactivityTimer, { passive: true });
+  });
+
+  resetInactivityTimer(); // Iniciar cuenta regresiva al cargar
+  // ------------------------------------------------
+
   // Event Listeners
   document.getElementById('logoutBtn').addEventListener('click', logout);
   

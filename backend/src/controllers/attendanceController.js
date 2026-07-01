@@ -37,15 +37,10 @@ exports.markAttendance = async (req, res) => {
     // (WiFi SSID is still saved to DB if sent, but it does not affect validity)
 
     // 4. Determine if entry or exit based on today's existing records
-    const todayStr = new Date().toLocaleString('en-US', { timeZone: settings.timezone || 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
-    // Convert MM/DD/YYYY to YYYY-MM-DD
-    const todayParts = new Date().toLocaleString('en-US', { timeZone: settings.timezone || 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/');
-    const formattedToday = `${todayParts[2]}-${todayParts[0]}-${todayParts[1]}`;
-
     const { rows: todayRecords } = await pool.query(
       `SELECT type FROM attendance
-       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = $3`,
-      [user.id, settings.timezone || 'America/Lima', formattedToday]
+       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = DATE(NOW() AT TIME ZONE $2)`,
+      [user.id, settings.timezone || 'America/Lima']
     );
 
     const hasEntry = todayRecords.some(r => r.type === 'entry');
@@ -132,14 +127,12 @@ exports.markAttendance = async (req, res) => {
 exports.getTodayAttendance = async (req, res) => {
   try {
     const settings = await getSettings();
-    const todayStr = new Date().toISOString().split('T')[0];
-
     const { rows } = await pool.query(
       `SELECT id, type, timestamp, is_valid, rejection_reason, photo_url
        FROM attendance
-       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = $3
+       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = DATE(NOW() AT TIME ZONE $2)
        ORDER BY timestamp ASC`,
-      [req.user.id, settings.timezone || 'America/Lima', todayStr]
+      [req.user.id, settings.timezone || 'America/Lima']
     );
 
     // Derive next expected action based on today's records
