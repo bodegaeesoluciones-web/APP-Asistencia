@@ -36,13 +36,28 @@ exports.markAttendance = async (req, res) => {
     // 3. WiFi validation REMOVED — no longer required
     // (WiFi SSID is still saved to DB if sent, but it does not affect validity)
 
-    // 4. Determine if entry or exit based strictly on time
-    // Before 12:00 PM = Entrada, 12:00 PM or later = Salida
-    const now = new Date();
-    const localTime = new Date(now.toLocaleString('en-US', { timeZone: settings.timezone || 'America/Lima' }));
-    const currentHour = localTime.getHours();
+    // 4. Determine if entry or exit based on today's existing records
+    const todayStr = new Date().toLocaleString('en-US', { timeZone: settings.timezone || 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
+    // Convert MM/DD/YYYY to YYYY-MM-DD
+    const todayParts = new Date().toLocaleString('en-US', { timeZone: settings.timezone || 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/');
+    const formattedToday = `${todayParts[2]}-${todayParts[0]}-${todayParts[1]}`;
+
+    const { rows: todayRecords } = await pool.query(
+      `SELECT type FROM attendance
+       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = $3`,
+      [user.id, settings.timezone || 'America/Lima', formattedToday]
+    );
+
+    const hasEntry = todayRecords.some(r => r.type === 'entry');
+    const hasExit = todayRecords.some(r => r.type === 'exit');
     
-    const type = currentHour < 12 ? 'entry' : 'exit';
+    let type = 'entry';
+    if (hasEntry && !hasExit) {
+      type = 'exit';
+    } else if (hasEntry && hasExit) {
+      // If they already have both, default to entry (or you could block it)
+      type = 'entry';
+    }
 
     // 5. Upload photo to ImgBB (non-blocking: failure won't block attendance record)
     let photoUrl = null;
@@ -127,10 +142,13 @@ exports.getTodayAttendance = async (req, res) => {
       [req.user.id, settings.timezone || 'America/Lima', todayStr]
     );
 
-    // Derive next expected action strictly by time
-    const now = new Date();
-    const localTime = new Date(now.toLocaleString('en-US', { timeZone: settings.timezone || 'America/Lima' }));
-    const nextAction = localTime.getHours() < 12 ? 'entry' : 'exit';
+    // Derive next expected action based on today's records
+    const hasEntry = rows.some(r => r.type === 'entry');
+    const hasExit = rows.some(r => r.type === 'exit');
+    let nextAction = 'entry';
+    if (hasEntry && !hasExit) {
+      nextAction = 'exit';
+    }
 
     res.json({ records: rows, nextAction });
   } catch (err) {
