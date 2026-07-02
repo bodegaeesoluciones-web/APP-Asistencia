@@ -872,9 +872,10 @@
     setInterval(updateClock, 1000);
 
     // ─────────────────────────────────────────────────
-    // GPS
+    // GPS — watchPosition para actualización continua
     // ─────────────────────────────────────────────────
     let gpsData = null;
+    let gpsWatchId = null;
 
     function setGpsBadge(state, text) {
       const badge = $('gpsBadge');
@@ -882,35 +883,55 @@
       $('gpsBadgeText').textContent = text;
     }
 
-    function requestGPS() {
+    function startGPSWatch() {
       setGpsBadge('checking', 'GPS...');
       if (!navigator.geolocation) {
         setGpsBadge('error', 'Sin GPS');
         showAlert('Tu dispositivo no soporta geolocalización.', 'error');
+        $('btnMark').disabled = false;
         return;
       }
-      navigator.geolocation.getCurrentPosition(
+
+      // Cancelar cualquier watch previo antes de iniciar uno nuevo
+      if (gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+        gpsWatchId = null;
+      }
+
+      // Limpiar dato previo para no usar coordenadas cacheadas
+      gpsData = null;
+
+      gpsWatchId = navigator.geolocation.watchPosition(
         pos => {
-          gpsData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
+          gpsData = {
+            latitude:  pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy:  pos.coords.accuracy
+          };
           setGpsBadge('ok', `±${Math.round(pos.coords.accuracy)}m`);
-          $('gpsLocationText').textContent = `📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
-          // Enable the button once we have GPS
+          $('gpsLocationText').textContent =
+            `📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
           $('btnMark').disabled = false;
           clearAlert();
         },
         err => {
-          setGpsBadge('error', 'Sin GPS');
-          $('gpsLocationText').textContent = '';
-          // Enable button anyway — GPS failed but user can still mark with warning
-          $('btnMark').disabled = false;
-          if (err.code === 1) showAlert('Ubicación denegada. La marcación se registrará sin validación de distancia.', 'warning');
-          else showAlert('No se pudo obtener GPS. Puedes continuar igualmente.', 'warning');
+          // Solo actualizar el badge si aún no tenemos coordenadas válidas
+          if (!gpsData) {
+            setGpsBadge('error', 'Sin GPS');
+            $('gpsLocationText').textContent = '';
+            $('btnMark').disabled = false;
+            if (err.code === 1)
+              showAlert('Permiso de ubicación denegado. Actívalo en los ajustes del navegador.', 'error');
+            else
+              showAlert('No se pudo obtener GPS. Verifica que el GPS esté encendido.', 'warning');
+          }
         },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+        // maximumAge: 0 → siempre posición fresca, sin caché
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     }
 
-    requestGPS();
+    startGPSWatch();
 
     // ─────────────────────────────────────────────────
     // TODAY STATUS
@@ -1105,11 +1126,11 @@
     $('btnMark').addEventListener('click', () => {
       clearAlert();
       if (!gpsData) {
-        // No GPS yet — still open camera modal but with a note
-        // GPS may have timed out or been denied; we let the user continue
-        showAlert('Marcando sin GPS válido. El registro se guardará como fuera de rango.', 'warning');
-        // Use 0,0 as a placeholder so the backend still receives the request
-        gpsData = { latitude: 0, longitude: 0, accuracy: null };
+        // GPS todavía no está disponible — no permitir marcar sin coordenadas reales
+        showAlert('⏳ Esperando señal GPS. Asegúrate de tener el GPS activado y espera unos segundos.', 'warning');
+        // Reintentar obtención de GPS
+        startGPSWatch();
+        return;
       }
       openCameraModal();
     });
@@ -1150,8 +1171,8 @@
 
         // Refresh history
         await loadTodayStatus();
-        // Re-request GPS for next attempt
-        requestGPS();
+        // Re-iniciar watch GPS para el siguiente intento (limpia coordenadas cacheadas)
+        startGPSWatch();
 
       } catch (err) {
         closeCameraModal();

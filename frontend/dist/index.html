@@ -388,12 +388,6 @@
   </div>
 
   <script>
-    // ── Capturar errores JS globales ──
-    window.onerror = function(msg, src, line, col, err) {
-      alert('ERROR JS en línea ' + line + ': ' + msg);
-      return false;
-    };
-
     document.addEventListener('DOMContentLoaded', function() {
       console.log('DOM listo. loginForm:', document.getElementById('loginForm'));
     });
@@ -484,7 +478,6 @@
 
       try {
         console.log('Enviando login con', username);
-        alert('Enviando login...');
         const resp = await fetch(`${API_BASE}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -496,7 +489,6 @@
           }),
         });
         console.log('Respuesta recibida', resp);
-        alert('Respuesta recibida, status '+resp.status);
         const data = await resp.json();
 
         if (!resp.ok) {
