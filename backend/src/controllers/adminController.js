@@ -273,3 +273,39 @@ exports.updateSystemSettings = async (req, res) => {
     res.status(500).json({ error: 'Error al actualizar configuración' });
   }
 };
+
+// === Clear Today's Attendance (Emergency Reset) ===
+exports.clearTodayAttendance = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const settings = await getSettings();
+    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Lima';
+    const todayInTz = new Date().toLocaleDateString('en-CA', { timeZone: TZ }); // 'YYYY-MM-DD'
+
+    const { rowCount } = await pool.query(
+      `DELETE FROM attendance
+       WHERE user_id = $1
+         AND DATE(timestamp AT TIME ZONE $2) = $3::date`,
+      [id, TZ, todayInTz]
+    );
+
+    // Audit log
+    const { logAudit } = require('../utils/audit');
+    await logAudit({
+      userId: req.user.id,
+      action: 'ADMIN_CLEAR_TODAY_ATTENDANCE',
+      details: { targetUserId: id, deletedRecords: rowCount, date: todayInTz, tz: TZ },
+      ipAddress: req.ip,
+      success: true,
+    });
+
+    res.json({
+      message: `Se eliminaron ${rowCount} registro(s) de asistencia de hoy (${todayInTz}) para el colaborador. Ahora puede marcar entrada nuevamente.`,
+      deleted: rowCount,
+      date: todayInTz,
+    });
+  } catch (err) {
+    console.error('clearTodayAttendance error:', err);
+    res.status(500).json({ error: 'Error al limpiar registros de hoy' });
+  }
+};

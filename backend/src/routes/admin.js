@@ -17,6 +17,9 @@ router.delete('/users/:id', adminController.deleteUser);
 // Reset devices for a user
 router.delete('/users/:id/devices', adminController.resetUserDevices);
 
+// Clear today's attendance for a user (emergency reset)
+router.delete('/users/:id/attendance/today', adminController.clearTodayAttendance);
+
 // Devices
 router.get('/devices', adminController.getDevices);
 router.delete('/devices/:id', adminController.deleteDevice);

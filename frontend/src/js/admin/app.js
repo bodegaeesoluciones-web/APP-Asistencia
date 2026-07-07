@@ -209,6 +209,9 @@ async function loadUsers() {
           <button class="btn btn-sm btn-outline-warning mr-1" onclick="resetUserDevice('${u.id}', '${escHtml(u.full_name)}')">
             Reset
           </button>
+          <button class="btn btn-sm btn-outline-secondary mr-1" onclick="clearUserTodayAttendance('${u.id}', '${escHtml(u.full_name)}')">
+            Limpiar Hoy
+          </button>
           <button class="btn btn-sm btn-outline-danger" onclick="deleteUser('${u.id}', '${escHtml(u.full_name)}')">
             Eliminar
           </button>
@@ -318,6 +321,21 @@ async function saveUser() {
     btnSave.disabled = false;
   }
 }
+
+// ─────────────────────────────────────────────
+// CLEAR TODAY ATTENDANCE
+// ─────────────────────────────────────────────
+window.clearUserTodayAttendance = async function(id, userName) {
+  if (!confirm(`¿Estás seguro de limpiar los registros de asistencia de HOY para el técnico ${userName}? Esto le permitirá marcar entrada nuevamente.`)) return;
+
+  try {
+    const res = await api.delete(`/admin/users/${id}/attendance/today`);
+    alert(`✅ ${res.message || 'Registros limpiados correctamente.'}`);
+    await loadDashboard(); // refresh stats
+  } catch (err) {
+    alert(err.message || 'Error al limpiar registros de asistencia.');
+  }
+};
 
 // ─────────────────────────────────────────────
 // RESET USER DEVICE
