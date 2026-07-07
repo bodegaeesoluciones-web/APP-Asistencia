@@ -818,14 +818,30 @@
 
     function getToken() { return localStorage.getItem('access_token'); }
 
+    async function getDeviceFingerprint() {
+      let fp = localStorage.getItem('device_fingerprint');
+      if (fp) return fp;
+      const str = `${navigator.userAgent}|${screen.width}x${screen.height}|${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash = hash & hash;
+      }
+      fp = `dev_${Math.abs(hash)}_${Math.random().toString(36).substring(2, 10)}`;
+      localStorage.setItem('device_fingerprint', fp);
+      return fp;
+    }
+
     async function apiFetch(path, opts = {}) {
       // Allow overriding the default /api prefix with a custom API_BASE
       const fetchPath = path.startsWith('/api') ? `${API_BASE}${path.substring(4)}` : path;
+      const fingerprint = await getDeviceFingerprint();
       const res = await fetch(fetchPath, {
         ...opts,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
+          'x-device-fingerprint': fingerprint,
           ...(opts.headers || {}),
         },
       });
