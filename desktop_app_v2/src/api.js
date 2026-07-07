@@ -219,13 +219,17 @@ class APIClient {
 
   // Reset all registered devices for a user (so they can log in from a new device)
   async resetUserDevices(userId) {
-    const res = await this.request(`/admin/users/${userId}/devices`, { method: 'DELETE' });
-    if (res.ok) {
-      const data = await res.json();
-      return { success: true, data };
+    try {
+      const res = await this.request(`/admin/users/${userId}/devices`, { method: 'DELETE' });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, data };
+      }
+      const err = await res.json();
+      return { success: false, message: err.error || 'Error al resetear dispositivos' };
+    } catch (e) {
+      return { success: false, message: 'Error al comunicarse con el servidor al resetear dispositivo.' };
     }
-    const err = await res.json();
-    return { success: false, message: err.error || 'Error al resetear dispositivos' };
   }
 
   async getAttendance(startDate, endDate) {
