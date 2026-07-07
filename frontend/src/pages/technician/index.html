@@ -724,7 +724,7 @@
 
     <!-- MAIN CTA -->
     <div class="mark-btn-wrap">
-      <button class="btn-mark ready" id="btnMark">
+      <button class="btn-mark ready" id="btnMark" disabled>
         <svg class="btn-icon" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
@@ -888,7 +888,7 @@
       if (!navigator.geolocation) {
         setGpsBadge('error', 'Sin GPS');
         showAlert('Tu dispositivo no soporta geolocalización.', 'error');
-        $('btnMark').disabled = false;
+        $('btnMark').disabled = true; // sin soporte de GPS → no permitir marcar
         return;
       }
 
@@ -911,7 +911,7 @@
           setGpsBadge('ok', `±${Math.round(pos.coords.accuracy)}m`);
           $('gpsLocationText').textContent =
             `📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
-          $('btnMark').disabled = false;
+          $('btnMark').disabled = false;   // ← habilitar solo cuando hay GPS real
           clearAlert();
         },
         err => {
@@ -919,11 +919,11 @@
           if (!gpsData) {
             setGpsBadge('error', 'Sin GPS');
             $('gpsLocationText').textContent = '';
-            $('btnMark').disabled = false;
+            $('btnMark').disabled = true;  // ← MANTENER deshabilitado sin GPS real
             if (err.code === 1)
               showAlert('Permiso de ubicación denegado. Actívalo en los ajustes del navegador.', 'error');
             else
-              showAlert('No se pudo obtener GPS. Verifica que el GPS esté encendido.', 'warning');
+              showAlert('No se pudo obtener GPS. Verifica que el GPS esté encendido y espera unos segundos.', 'warning');
           }
         },
         // maximumAge: 0 → siempre posición fresca, sin caché
@@ -984,8 +984,17 @@
         }
       }
 
-      // Update button text
-      $('btnMarkText').textContent = next === 'exit' ? 'MARCAR SALIDA' : 'MARCAR ASISTENCIA';
+      // Update button text and color
+      const btnMark = $('btnMark');
+      if (next === 'exit') {
+        $('btnMarkText').textContent = 'MARCAR SALIDA';
+        btnMark.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+        btnMark.style.boxShadow = '0 0 40px rgba(239,68,68,0.4)';
+      } else {
+        $('btnMarkText').textContent = 'MARCAR ASISTENCIA';
+        btnMark.style.background = '';
+        btnMark.style.boxShadow = '';
+      }
     }
 
     function renderHistory(records) {
@@ -1176,7 +1185,15 @@
 
       } catch (err) {
         closeCameraModal();
-        showAlert(`Error de conexión: ${err.message}`, 'error');
+        // Detect specific backend error codes
+        let errMsg = `Error de conexión: ${err.message}`;
+        try {
+          const errData = typeof err === 'object' && err.json ? await err.json() : null;
+          if (errData && errData.code === 'DEVICE_NOT_AUTHORIZED') {
+            errMsg = '❌ Dispositivo no autorizado. Contacta al administrador para registrar este dispositivo.';
+          }
+        } catch(_) {}
+        showAlert(errMsg, 'error');
       }
     });
 

@@ -37,22 +37,32 @@ exports.markAttendance = async (req, res) => {
     // (WiFi SSID is still saved to DB if sent, but it does not affect validity)
 
     // 4. Determine if entry or exit based on today's VALID records only
+    // Always force America/Lima timezone to avoid UTC date mismatch on Render
+    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Lima';
+
+    // Compute today's date string in the target timezone (e.g. '2026-07-07')
+    const todayInTz = new Date().toLocaleDateString('en-CA', { timeZone: TZ }); // 'YYYY-MM-DD'
+
     const { rows: todayRecords } = await pool.query(
-      `SELECT type FROM attendance
+      `SELECT id, type, timestamp
+       FROM attendance
        WHERE user_id = $1
-         AND DATE(timestamp AT TIME ZONE $2) = DATE(NOW() AT TIME ZONE $2)
-         AND is_valid = true`,
-      [user.id, settings.timezone || 'America/Lima']
+         AND DATE(timestamp AT TIME ZONE $2) = $3::date
+         AND is_valid = true
+       ORDER BY timestamp ASC`,
+      [user.id, TZ, todayInTz]
     );
 
+    console.log(`[markAttendance] user=${user.id} tz=${TZ} today=${todayInTz} validRecordsToday=${JSON.stringify(todayRecords.map(r => ({ type: r.type, ts: r.timestamp })))}`);
+
     const hasEntry = todayRecords.some(r => r.type === 'entry');
-    const hasExit = todayRecords.some(r => r.type === 'exit');
-    
+    const hasExit  = todayRecords.some(r => r.type === 'exit');
+
     let type = 'entry';
     if (hasEntry && !hasExit) {
       type = 'exit';
     } else if (hasEntry && hasExit) {
-      // If they already have both, default to entry (or you could block it)
+      // Both already marked today → start a new entry cycle
       type = 'entry';
     }
 
@@ -134,12 +144,16 @@ exports.markAttendance = async (req, res) => {
 exports.getTodayAttendance = async (req, res) => {
   try {
     const settings = await getSettings();
+    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Lima';
+    const todayInTz = new Date().toLocaleDateString('en-CA', { timeZone: TZ }); // 'YYYY-MM-DD'
+
     const { rows } = await pool.query(
       `SELECT id, type, timestamp, is_valid, rejection_reason, photo_url
        FROM attendance
-       WHERE user_id = $1 AND DATE(timestamp AT TIME ZONE $2) = DATE(NOW() AT TIME ZONE $2)
+       WHERE user_id = $1
+         AND DATE(timestamp AT TIME ZONE $2) = $3::date
        ORDER BY timestamp ASC`,
-      [req.user.id, settings.timezone || 'America/Lima']
+      [req.user.id, TZ, todayInTz]
     );
 
     // Derive next expected action based on today's VALID records only
@@ -150,6 +164,7 @@ exports.getTodayAttendance = async (req, res) => {
       nextAction = 'exit';
     }
 
+    console.log(`[getTodayAttendance] user=${req.user.id} tz=${TZ} today=${todayInTz} nextAction=${nextAction} records=${rows.length}`);
     res.json({ records: rows, nextAction });
   } catch (err) {
     console.error('Get today attendance error:', err);
