@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { formatTimeFromLocalStr, extractDateFromLocalStr } from '../utils/timezone';
 import { api } from '../api';
 import { RefreshCw, Download, Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -35,33 +37,159 @@ function timeToMinutes(t) {
   return h * 60 + m;
 }
 
-// ─── Planilla Export to CSV ───────────────────────────────────────────────────
-function exportToCSV(rows, days, monthLabel) {
-  const headers = ['NOMBRE', 'CÉDULA', ...days.flatMap(d => [`ENT ${d.full}`, `SAL ${d.full}`])];
-  const csvRows = [headers.join(',')];
+// ─── Planilla Export to Excel (.xlsx con colores) ────────────────────────────
+function exportToExcel(rows, days, monthLabel) {
 
-  rows.forEach(row => {
-    const cells = [
-      `"${row.name}"`,
-      row.cedula,
-      ...days.flatMap(d => {
-        const rec = row.days[d.date] || {};
-        return [rec.entry || '—', rec.exit || '—'];
-      }),
-    ];
-    csvRows.push(cells.join(','));
+  // ── Paleta de colores ──────────────────────────────────────────────────────
+  const C = {
+    hdrBg:     '1E3A5F',  // azul marino — cabecera día
+    hdrFg:     'FFFFFF',
+    subBg:     '2563EB',  // azul — fila ENT/SAL
+    subFg:     'FFFFFF',
+    wkndHdr:   'B45309',  // naranja — encabezado fin de semana
+    wkndSub:   'D97706',
+    wkndData:  'FFF7ED',  // naranja muy pálido — datos fin de semana
+    rowA:      'EFF6FF',  // azul pálido — fila par
+    rowB:      'FFFFFF',  // blanco — fila impar
+    nameBg:    '1E3A5F',  // azul marino — columna nombre
+    nameFg:    'FFFFFF',
+    cedFg:     '374151',
+    entryFg:   '065F46',  // verde oscuro — hora entrada registrada
+    exitFg:    '92400E',  // naranja oscuro — hora salida registrada
+    emptyFg:   'CBD5E1',  // gris — 00:00 vacío
+  };
+
+  const border = { style: 'thin', color: { rgb: 'CBD5E1' } };
+  const borderThick = { style: 'medium', color: { rgb: '64748B' } };
+
+  const mkBorder  = (thick = false) => {
+    const b = thick ? borderThick : border;
+    return { top: b, bottom: b, left: b, right: b };
+  };
+
+  const mkStyle = (bgHex, fgHex, bold = false, sz = 9, hAlign = 'center', thick = false) => ({
+    font:      { name: 'Calibri', sz, bold, color: { rgb: fgHex } },
+    fill:      { patternType: 'solid', fgColor: { rgb: bgHex } },
+    alignment: { horizontal: hAlign, vertical: 'center', wrapText: false },
+    border:    mkBorder(thick),
   });
 
-  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Planilla_Asistencia_${monthLabel}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  // ── Filas de datos ─────────────────────────────────────────────────────────
+  const totalCols = 2 + days.length * 2;
+  const AOA = [];   // array-of-arrays para valores
+  const styles = []; // estilos paralelos
+
+  const pushRow = (values, styleRow) => { AOA.push(values); styles.push(styleRow); };
+
+  // Fila 0 — Título
+  const titleStyle = mkStyle(C.hdrBg, C.hdrFg, true, 13, 'center', true);
+  pushRow(
+    [`PLANILLA DE ASISTENCIA — ${monthLabel.toUpperCase()}`, ...Array(totalCols - 1).fill('')],
+    [titleStyle, ...Array(totalCols - 1).fill({ ...titleStyle })]
+  );
+
+  // Fila 1 — Nombres de días
+  const dayNameVals  = ['COLABORADOR', 'CÉDULA'];
+  const dayNameStys  = [
+    mkStyle(C.hdrBg, C.hdrFg, true, 9, 'left',   true),
+    mkStyle(C.hdrBg, C.hdrFg, true, 9, 'center', true),
+  ];
+  days.forEach(d => {
+    const bg = d.isWeekend ? C.wkndHdr : C.hdrBg;
+    const s  = mkStyle(bg, C.hdrFg, true, 9, 'center', true);
+    dayNameVals.push(`${d.short} ${d.num}`, '');
+    dayNameStys.push(s, { ...s });
+  });
+  pushRow(dayNameVals, dayNameStys);
+
+  // Fila 2 — ENT / SAL
+  const subVals = ['', ''];
+  const subStys = [
+    mkStyle(C.subBg, C.subFg, true, 8, 'center', true),
+    mkStyle(C.subBg, C.subFg, true, 8, 'center', true),
+  ];
+  days.forEach(d => {
+    const bg = d.isWeekend ? C.wkndSub : C.subBg;
+    subVals.push('ENT', 'SAL');
+    subStys.push(
+      mkStyle(bg, C.subFg, true, 8, 'center', true),
+      mkStyle(bg, C.subFg, true, 8, 'center', true)
+    );
+  });
+  pushRow(subVals, subStys);
+
+  // Filas de datos — un colaborador por fila
+  rows.forEach((row, idx) => {
+    const rowBg  = idx % 2 === 0 ? C.rowA : C.rowB;
+    const vals   = [row.name, row.cedula];
+    const stys   = [
+      mkStyle(C.nameBg, C.nameFg, true,  9, 'left',   true),
+      mkStyle(rowBg,    C.cedFg,  false, 9, 'center', false),
+    ];
+
+    days.forEach(d => {
+      const rec    = row.days[d.date] || {};
+      const bg     = d.isWeekend ? C.wkndData : rowBg;
+
+      const entVal = rec.entry || '00:00';
+      const salVal = rec.exit  || '00:00';
+      const entFg  = rec.entry ? C.entryFg : C.emptyFg;
+      const salFg  = rec.exit  ? C.exitFg  : C.emptyFg;
+      const entBold = !!rec.entry;
+      const salBold = !!rec.exit;
+
+      vals.push(entVal, salVal);
+      stys.push(
+        mkStyle(bg, entFg, entBold, 9, 'center', false),
+        mkStyle(bg, salFg, salBold, 9, 'center', false)
+      );
+    });
+    pushRow(vals, stys);
+  });
+
+  // ── Construir worksheet ────────────────────────────────────────────────────
+  const ws = XLSX.utils.aoa_to_sheet(AOA);
+
+  // Inyectar estilos celda por celda
+  AOA.forEach((row, ri) => {
+    row.forEach((val, ci) => {
+      const addr = XLSX.utils.encode_cell({ r: ri, c: ci });
+      if (!ws[addr]) ws[addr] = { t: 's', v: val };
+      ws[addr].s = styles[ri][ci];
+    });
+  });
+
+  // Anchos de columna
+  ws['!cols'] = [
+    { wch: 32 },  // Nombre
+    { wch: 14 },  // Cédula
+    ...days.flatMap(() => [{ wch: 8 }, { wch: 8 }]),
+  ];
+
+  // Alturas de fila
+  ws['!rows'] = [
+    { hpt: 26 },   // título
+    { hpt: 22 },   // nombres de días
+    { hpt: 16 },   // ENT/SAL
+    ...rows.map(() => ({ hpt: 18 })),
+  ];
+
+  // Fusionar celdas: título y pares de día
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+    ...days.map((_, di) => ({
+      s: { r: 1, c: 2 + di * 2 },
+      e: { r: 1, c: 3 + di * 2 },
+    })),
+  ];
+
+  // ── Exportar ───────────────────────────────────────────────────────────────
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Planilla');
+  const safeName = monthLabel.replace(/\s+/g, '_').replace(/[^\w_-]/g, '');
+  XLSX.writeFile(wb, `Planilla_Asistencia_${safeName}.xlsx`);
 }
+
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function PlanillaAsistencia({ users }) {
@@ -119,7 +247,8 @@ export default function PlanillaAsistencia({ users }) {
       if (!lookup[cedula]) lookup[cedula] = {};
       if (!lookup[cedula][dateKey]) lookup[cedula][dateKey] = { entry: null, exit: null };
 
-      const timeStr = new Date(rec.local_time).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
+      // Extraer la hora directamente del string para no re-interpretar con timezone del PC
+      const timeStr = formatTimeFromLocalStr(rec.local_time);
 
       if (rec.type === 'entry') lookup[cedula][dateKey].entry = timeStr;
       else lookup[cedula][dateKey].exit = timeStr;
@@ -174,10 +303,10 @@ export default function PlanillaAsistencia({ users }) {
             <RefreshCw size={15} /> Actualizar
           </button>
           <button
-            onClick={() => exportToCSV(planillaRows, formattedDays, monthLabel)}
+            onClick={() => exportToExcel(planillaRows, formattedDays, monthLabel)}
             style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)', borderRadius: '8px', padding: '0.5rem 0.85rem', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '600' }}
           >
-            <Download size={15} /> Exportar CSV
+            <Download size={15} /> Exportar Excel
           </button>
         </div>
       </div>

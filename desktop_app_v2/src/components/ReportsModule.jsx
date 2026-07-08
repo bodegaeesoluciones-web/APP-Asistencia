@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { todayPanama, daysAgoPanama } from '../utils/timezone';
 import { api } from '../api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Filter, Calendar } from 'lucide-react';
@@ -7,8 +8,9 @@ export default function ReportsModule({ users }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState({ 
-    start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0], 
-    end: new Date().toISOString().split('T')[0] 
+    // Usar hora de Panamá (GMT-5) en vez de UTC
+    start: daysAgoPanama(30), 
+    end: todayPanama()
   });
 
   const loadData = async () => {

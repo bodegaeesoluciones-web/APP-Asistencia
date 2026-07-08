@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { todayPanama, formatTimeFromLocalStr, extractDateFromLocalStr } from '../utils/timezone';
 import { api } from '../api';
 import { Search, Filter, RefreshCw, X, MapPin, MonitorSmartphone, Calendar, Camera } from 'lucide-react';
 
@@ -21,8 +22,8 @@ export default function AttendanceMatrix({ users }) {
 
   // Fetch data
   const fetchData = async () => {
-    // If no date range is set, default to today for real-time monitoring
-    const today = new Date().toISOString().split('T')[0];
+    // Usar hora de Panamá (GMT-5) en vez de UTC para evitar desfase de fecha
+    const today = todayPanama();
     const sDate = dateRange.start || today;
     const eDate = dateRange.end || today;
 
@@ -63,7 +64,7 @@ export default function AttendanceMatrix({ users }) {
     const map = new Map();
 
     attendance.forEach(rec => {
-      const date = rec.local_time.split('T')[0];
+      const date = extractDateFromLocalStr(rec.local_time);
       const key = `${rec.user_name || rec.user_id}_${date}`;
       
       if (!map.has(key)) {
@@ -76,7 +77,7 @@ export default function AttendanceMatrix({ users }) {
           entry_time: null,
           exit_time: null,
           status: 'Ausente',
-          distance: rec.latitude ? `Lat: ${rec.latitude.toFixed(4)}, Lng: ${rec.longitude.toFixed(4)}` : '--',
+          distance: rec.latitude ? `Lat: ${parseFloat(rec.latitude).toFixed(4)}, Lng: ${parseFloat(rec.longitude).toFixed(4)}` : '--',
           ip_address: rec.ip_address || '--',
           device_name: rec.device_name || '--',
           photo_entry: null,
@@ -87,7 +88,8 @@ export default function AttendanceMatrix({ users }) {
       }
 
       const row = map.get(key);
-      const timeStr = new Date(rec.local_time).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      // Extraer la hora directamente del string para no re-interpretar con timezone del PC
+      const timeStr = formatTimeFromLocalStr(rec.local_time);
       
       if (rec.type === 'entry') {
         row.entry_time = timeStr;

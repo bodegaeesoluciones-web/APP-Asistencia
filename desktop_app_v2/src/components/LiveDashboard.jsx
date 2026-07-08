@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { todayPanama } from '../utils/timezone';
 import { api } from '../api';
 import { Users, UserCheck, UserX, Clock, MapPin, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
@@ -9,7 +10,8 @@ export default function LiveDashboard({ users, stats }) {
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
   const fetchTodayData = async () => {
-    const today = new Date().toISOString().split('T')[0];
+    // Usar hora de Panamá (GMT-5) en vez de UTC para evitar desfase de fecha al cruzar medianoche
+    const today = todayPanama();
     try {
       const res = await api.getAttendance(today, today);
       if (res.success) {

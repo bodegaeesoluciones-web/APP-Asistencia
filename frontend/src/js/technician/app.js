@@ -1,9 +1,8 @@
 import { api, showAlert, clearAlert, formatError } from '../api.js';
 import { logout } from '../auth.js';
-import { getGPSLocation, getWiFiSSID } from '../gps.js';
+import { getGPSLocation } from '../gps.js';
 let currentGPS = null;
-let wifiConfirmed = false;
-let authorizedSsidSettings = 'EESOLUCIONES_BASE'; // Will be fetched from backend if possible or assumed
+let nextActionType = 'entry'; // Fetched from backend before showing confirm
 
 document.addEventListener('DOMContentLoaded', async () => {
   const userId = localStorage.getItem('userId');
@@ -29,6 +28,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!sessionStorage.getItem('auto_attendance_marked')) {
     sessionStorage.setItem('auto_attendance_marked', 'true');
     startValidationFlow();
+  }
+
+  // Confirm button
+  const confirmBtn = document.getElementById('btnConfirmAttendance');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', () => {
+      if (currentGPS) {
+        processAttendance();
+      } else {
+        showAlert('validationAlertContainer', 'Primero debe obtener la ubicación GPS.', 'danger');
+      }
+    });
   }
 
   // --- AUTO-LOGOUT POR INACTIVIDAD (30 SEGUNDOS) ---
@@ -67,31 +78,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('historyModal').classList.remove('show');
   });
 
-  document.getElementById('wifiConfirmCheck').addEventListener('change', (e) => {
-    wifiConfirmed = e.target.checked;
-    const icon = document.querySelector('#val-wifi .validation-icon');
-    const text = document.getElementById('val-wifi-text');
-    
-    if (wifiConfirmed) {
-      icon.className = 'validation-icon success';
-      icon.innerHTML = '<i data-lucide="check-circle"></i>';
-      text.textContent = 'Confirmado manualmente';
-      text.classList.remove('text-danger');
-      text.classList.add('text-success');
-      
-      // If GPS is also done, execute attendance
-      if (currentGPS) {
-        processAttendance();
+  // WiFi checkbox kept for UI compatibility but no longer blocks attendance
+  const wifiCheck = document.getElementById('wifiConfirmCheck');
+  if (wifiCheck) {
+    wifiCheck.addEventListener('change', (e) => {
+      const icon = document.querySelector('#val-wifi .validation-icon');
+      const text = document.getElementById('val-wifi-text');
+      if (e.target.checked) {
+        icon.className = 'validation-icon success';
+        icon.innerHTML = '<i data-lucide="check-circle"></i>';
+        text.textContent = 'Red confirmada';
+        text.classList.remove('text-danger');
+        text.classList.add('text-success');
+      } else {
+        icon.className = 'validation-icon pending';
+        icon.innerHTML = '<i data-lucide="alert-circle"></i>';
+        text.textContent = 'No confirmado';
+        text.classList.remove('text-success');
+        text.classList.add('text-warning');
       }
-    } else {
-      icon.className = 'validation-icon error';
-      icon.innerHTML = '<i data-lucide="x-circle"></i>';
-      text.textContent = 'Requiere confirmación';
-      text.classList.remove('text-success');
-      text.classList.add('text-danger');
-    }
-    lucide.createIcons();
-  });
+      lucide.createIcons();
+    });
+  }
 });
 
 function switchView(view) {
@@ -167,109 +175,124 @@ async function loadTodayHistory() {
 async function startValidationFlow() {
   switchView('scanner');
   clearAlert('validationAlertContainer');
-  document.getElementById('wifiConfirmContainer').classList.add('hidden');
-  
-  // Reset UI
+
+  // Hide confirm section until GPS is ready
+  const confirmSection = document.getElementById('attendanceConfirmSection');
+  if (confirmSection) confirmSection.classList.add('hidden');
+  const wifiContainer = document.getElementById('wifiConfirmContainer');
+  if (wifiContainer) wifiContainer.classList.add('hidden');
+
+  // Reset UI state
   currentGPS = null;
-  wifiConfirmed = false;
-  document.getElementById('wifiConfirmCheck').checked = false;
-  
+  const wifiCheck = document.getElementById('wifiConfirmCheck');
+  if (wifiCheck) wifiCheck.checked = false;
+
   const gpsIcon = document.querySelector('#val-gps .validation-icon');
   const gpsText = document.getElementById('val-gps-text');
   gpsIcon.className = 'validation-icon pending';
   gpsIcon.innerHTML = '<i data-lucide="loader" class="spinner-sm"></i>';
   gpsText.textContent = 'Obteniendo coordenadas...';
   gpsText.className = 'text-muted';
-  
+
   const wifiIcon = document.querySelector('#val-wifi .validation-icon');
   const wifiText = document.getElementById('val-wifi-text');
-  wifiIcon.className = 'validation-icon pending';
-  wifiIcon.innerHTML = '<i data-lucide="loader" class="spinner-sm"></i>';
-  wifiText.textContent = 'Verificando red...';
-  wifiText.className = 'text-muted';
-  
+  if (wifiIcon) {
+    wifiIcon.className = 'validation-icon pending';
+    wifiIcon.innerHTML = '<i data-lucide="wifi"></i>';
+  }
+  if (wifiText) {
+    wifiText.textContent = 'No requerido';
+    wifiText.className = 'text-muted';
+  }
+
   lucide.createIcons();
 
-  // 1. Get GPS
+  // 1. Fetch next expected action (entry/exit) from backend
+  try {
+    const todayData = await api.get('/attendance/today');
+    nextActionType = todayData.nextAction || 'entry';
+  } catch (e) {
+    nextActionType = 'entry';
+  }
+
+  // 2. Get GPS location
   try {
     currentGPS = await getGPSLocation();
     gpsIcon.className = 'validation-icon success';
     gpsIcon.innerHTML = '<i data-lucide="check-circle"></i>';
-    gpsText.textContent = `Lat: ${currentGPS.latitude.toFixed(5)}, Lng: ${currentGPS.longitude.toFixed(5)} (Precisión: ${Math.round(currentGPS.accuracy)}m)`;
+    gpsText.textContent = `Lat: ${currentGPS.latitude.toFixed(5)}, Lng: ${currentGPS.longitude.toFixed(5)} (±${Math.round(currentGPS.accuracy)}m)`;
     gpsText.className = 'text-success';
   } catch (err) {
     gpsIcon.className = 'validation-icon error';
     gpsIcon.innerHTML = '<i data-lucide="x-circle"></i>';
     gpsText.textContent = err.message;
     gpsText.className = 'text-danger';
-    showAlert('validationAlertContainer', `GPS Error: ${err.message}. Asegúrese de tener el GPS encendido y permisos otorgados.`);
+    showAlert('validationAlertContainer', `Error GPS: ${err.message}. Active el GPS y otorgue permisos de ubicación.`);
     lucide.createIcons();
     return; // Stop flow
   }
-  
+
   lucide.createIcons();
 
-  // 2. Check WiFi (Web fallback)
-  try {
-    const ssid = await getWiFiSSID();
-    if (ssid) {
-      // Very rare on web, but if supported:
-      if (ssid === authorizedSsidSettings) {
-        wifiConfirmed = true;
-        wifiIcon.className = 'validation-icon success';
-        wifiIcon.innerHTML = '<i data-lucide="check-circle"></i>';
-        wifiText.textContent = `Conectado a ${ssid}`;
-        wifiText.className = 'text-success';
-        processAttendance();
-      } else {
-        wifiIcon.className = 'validation-icon error';
-        wifiIcon.innerHTML = '<i data-lucide="x-circle"></i>';
-        wifiText.textContent = `Red incorrecta (${ssid})`;
-        wifiText.className = 'text-danger';
-        showAlert('validationAlertContainer', `Debe estar conectado a la red oficial. Red actual: ${ssid}`);
-      }
-      lucide.createIcons();
-    } else {
-      // Web default: Ask user to confirm
-      wifiIcon.className = 'validation-icon pending';
-      wifiIcon.innerHTML = '<i data-lucide="alert-circle"></i>';
-      wifiText.textContent = 'Requiere confirmación manual';
-      wifiText.className = 'text-warning';
-      document.getElementById('wifiConfirmContainer').classList.remove('hidden');
-      lucide.createIcons();
+  // 3. Show confirm button with the action type clearly labeled
+  if (confirmSection) {
+    const actionLabel = nextActionType === 'entry' ? '🟢 Registrar ENTRADA' : '🔴 Registrar SALIDA';
+    const confirmBtn = document.getElementById('btnConfirmAttendance');
+    if (confirmBtn) {
+      confirmBtn.textContent = actionLabel;
+      confirmBtn.className = nextActionType === 'entry'
+        ? 'btn btn-success btn-lg w-100 mt-3'
+        : 'btn btn-danger btn-lg w-100 mt-3';
     }
-  } catch (err) {
-    // Should not happen with our fallback
-    console.error(err);
+    confirmSection.classList.remove('hidden');
+  } else {
+    // No confirm section in HTML — process immediately
+    processAttendance();
   }
 }
 
 async function processAttendance() {
+  // Disable confirm button to prevent double-submit
+  const confirmBtn = document.getElementById('btnConfirmAttendance');
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Procesando...';
+  }
+
   try {
-    showAlert('alertContainer', 'Procesando validación de asistencia...', 'info');
+    showAlert('alertContainer', 'Procesando asistencia...', 'info');
     switchView('home');
-    
-    // Determine SSID to send. If web fallback, send the expected one so backend validates via IP instead
-    const ssidToSend = wifiConfirmed ? authorizedSsidSettings : '';
+
+    // Hide confirm section after switching view
+    const confirmSection = document.getElementById('attendanceConfirmSection');
+    if (confirmSection) confirmSection.classList.add('hidden');
 
     const data = await api.post('/attendance/mark', {
       latitude: currentGPS.latitude,
       longitude: currentGPS.longitude,
       gpsAccuracy: currentGPS.accuracy,
-      wifiSsid: ssidToSend
+      wifiSsid: null
     });
 
-    showAlert('alertContainer', data.message, 'success');
+    const typeLabel = data.type === 'entry' ? 'ENTRADA' : 'SALIDA';
+    showAlert('alertContainer', `✅ ${typeLabel} registrada a ${Math.round(data.distance)}m del punto base`, 'success');
+    currentGPS = null;
     await loadTodayHistory();
 
   } catch (err) {
     console.error('Attendance mark error:', err);
     let msg = formatError(err);
     if (err.data && err.data.reasons && err.data.reasons.length > 0) {
-      msg = `Asistencia rechazada. Motivos:<br>- ${err.data.reasons.join('<br>- ')}`;
+      const dist = err.data.distance !== undefined ? ` (estás a ${err.data.distance}m)` : '';
+      msg = `❌ Asistencia rechazada${dist}:<br>- ${err.data.reasons.join('<br>- ')}`;
     }
     showAlert('alertContainer', msg, 'danger');
+    currentGPS = null;
     await loadTodayHistory();
+  } finally {
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+    }
   }
 }
 

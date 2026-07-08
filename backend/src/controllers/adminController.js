@@ -6,10 +6,10 @@ const { getSettings, updateSetting } = require('../services/settingsService');
 exports.getDashboard = async (req, res) => {
   try {
     const settings = await getSettings();
-    const tz = settings.timezone || 'America/Lima';
+    const tz = settings.timezone || 'America/Panama';
     const lateHour = parseInt(settings.late_hour || '8', 10);
     const lateMinute = parseInt(settings.late_minute || '0', 10);
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tz }); // 'YYYY-MM-DD' en hora Panamá
 
     // Total active technicians
     const { rows: techRows } = await pool.query(
@@ -73,10 +73,11 @@ exports.getUsers = async (req, res) => {
               entry_time, exit_time,
               created_at 
        FROM users 
+       WHERE role = 'technician'
        ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-    const { rows: countRows } = await pool.query("SELECT count(*) FROM users");
+    const { rows: countRows } = await pool.query("SELECT count(*) FROM users WHERE role = 'technician'");
     res.json({ users: rows, total: parseInt(countRows[0].count, 10) });
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener usuarios' });
@@ -279,7 +280,7 @@ exports.clearTodayAttendance = async (req, res) => {
   const { id } = req.params;
   try {
     const settings = await getSettings();
-    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Lima';
+    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Panama';
     const todayInTz = new Date().toLocaleDateString('en-CA', { timeZone: TZ }); // 'YYYY-MM-DD'
 
     const { rowCount } = await pool.query(

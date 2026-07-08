@@ -38,8 +38,8 @@ exports.markAttendance = async (req, res) => {
     // (WiFi SSID is still saved to DB if sent, but it does not affect validity)
 
     // 4. Determine if entry or exit based on today's VALID records only
-    // Always force America/Lima timezone to avoid UTC date mismatch on Render
-    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Lima';
+    // Usar America/Panama (GMT-5 fijo, sin horario de verano) para evitar desfase UTC en Render
+    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Panama';
 
     // Compute today's date string in the target timezone (e.g. '2026-07-07')
     const todayInTz = new Date().toLocaleDateString('en-CA', { timeZone: TZ }); // 'YYYY-MM-DD'
@@ -65,6 +65,24 @@ exports.markAttendance = async (req, res) => {
     } else if (hasEntry && hasExit) {
       // Both already marked today → start a new entry cycle
       type = 'entry';
+    }
+
+    if (!isValid) {
+      // Registrar solo en auditoría, pero NO en la tabla de asistencias
+      await logAudit({
+        userId: user.id,
+        action: 'ATTENDANCE_REJECTED_OUT_OF_RANGE',
+        details: { distance, reasons: rejectionReasons },
+        ipAddress: req.ip,
+        deviceFingerprint: device ? device.device_fingerprint : null,
+        success: false,
+      });
+
+      return res.status(403).json({
+        error: 'Fuera de rango',
+        reasons: rejectionReasons,
+        distance: Math.round(distance)
+      });
     }
 
     // 5. Upload photo to ImgBB (non-blocking: failure won't block attendance record)
@@ -107,25 +125,12 @@ exports.markAttendance = async (req, res) => {
     // 7. Audit log
     await logAudit({
       userId: user.id,
-      action: isValid ? `ATTENDANCE_MARKED_${type.toUpperCase()}` : 'ATTENDANCE_FAILED',
-      details: { type, distance, isValid, reasons: rejectionReasons, photoStatus },
+      action: `ATTENDANCE_MARKED_${type.toUpperCase()}`,
+      details: { type, distance, isValid: true, photoStatus },
       ipAddress: req.ip,
       deviceFingerprint: device ? device.device_fingerprint : null,
-      success: isValid,
+      success: true,
     });
-
-    if (!isValid) {
-      return res.status(403).json({
-        error: 'Validación fallida',
-        reasons: rejectionReasons,
-        recordId: newRecord[0].id,
-        type,
-        distance: Math.round(distance),
-        timestamp: new Date(),
-        photoStatus,
-        photoUrl,
-      });
-    }
 
     res.json({
       message: `Asistencia (${type === 'entry' ? 'Entrada' : 'Salida'}) registrada correctamente`,
@@ -145,7 +150,7 @@ exports.markAttendance = async (req, res) => {
 exports.getTodayAttendance = async (req, res) => {
   try {
     const settings = await getSettings();
-    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Lima';
+    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Panama';
     const todayInTz = new Date().toLocaleDateString('en-CA', { timeZone: TZ }); // 'YYYY-MM-DD'
 
     const { rows } = await pool.query(

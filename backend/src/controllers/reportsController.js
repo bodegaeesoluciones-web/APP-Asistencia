@@ -22,17 +22,21 @@ exports.getAttendance = async (req, res) => {
 async function getFilteredAttendance(req) {
   const { startDate, endDate, userId, status } = req.query;
   const settings = await getSettings();
-  const tz = settings.timezone || 'America/Lima';
+  const tz = settings.timezone || 'America/Panama';
   
+  // TO_CHAR devuelve una cadena SIN info de zona horaria (ej: '2026-07-07T09:29:25').
+  // JavaScript la interpreta siempre como hora local → no hay doble conversión
+  // sin importar qué timezone tenga el PC del cliente.
   let query = `
-    SELECT a.id, a.type, a.timestamp AT TIME ZONE $1 as local_time, 
+    SELECT a.id, a.type,
+           TO_CHAR(a.timestamp AT TIME ZONE $1, 'YYYY-MM-DD"T"HH24:MI:SS') as local_time,
            a.is_valid, a.rejection_reason, a.latitude, a.longitude,
            a.photo_url, a.ip_address,
            u.full_name as user_name, u.username as cedula, u.position as user_position, u.mobile_number, d.device_name
     FROM attendance a
     JOIN users u ON a.user_id = u.id
     LEFT JOIN devices d ON a.device_id = d.id
-    WHERE 1=1
+    WHERE u.role = 'technician'
   `;
   const params = [tz];
   let paramCount = 2;
@@ -63,6 +67,8 @@ async function getFilteredAttendance(req) {
 exports.exportExcel = async (req, res) => {
   try {
     const records = await getFilteredAttendance(req);
+    const settings = await getSettings();
+    const tz = settings.timezone || 'America/Panama';
     
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Asistencia', {
@@ -103,8 +109,8 @@ exports.exportExcel = async (req, res) => {
       const isValid = r.is_valid;
       
       const row = worksheet.addRow({
-        fecha: new Date(r.local_time).toLocaleDateString('es-ES'),
-        hora: new Date(r.local_time).toLocaleTimeString('es-ES'),
+        fecha: new Date(r.local_time).toLocaleDateString('es-ES', { timeZone: tz }),
+        hora: new Date(r.local_time).toLocaleTimeString('es-ES', { timeZone: tz }),
         nombre: r.user_name,
         cedula: r.cedula || '-',
         cargo: r.user_position || '-',
@@ -160,6 +166,8 @@ exports.exportExcel = async (req, res) => {
 exports.exportPDF = async (req, res) => {
   try {
     const records = await getFilteredAttendance(req);
+    const settings = await getSettings();
+    const tz = settings.timezone || 'America/Panama';
     
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
     
@@ -190,8 +198,8 @@ exports.exportPDF = async (req, res) => {
         y = 30;
       }
       
-      doc.text(new Date(r.local_time).toLocaleDateString(), 30, y);
-      doc.text(new Date(r.local_time).toLocaleTimeString(), 100, y);
+      doc.text(new Date(r.local_time).toLocaleDateString('es-ES', { timeZone: tz }), 30, y);
+      doc.text(new Date(r.local_time).toLocaleTimeString('es-ES', { timeZone: tz }), 100, y);
       doc.text(r.user_name, 160, y, { width: 180, truncate: true });
       doc.text(r.type === 'entry' ? 'Entrada' : 'Salida', 350, y);
       

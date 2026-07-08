@@ -271,7 +271,7 @@ class APIClient {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Reporte_Asistencia_${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.download = `Reporte_Asistencia_${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Panama' })}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();

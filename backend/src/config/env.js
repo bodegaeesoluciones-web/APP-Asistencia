@@ -22,8 +22,8 @@ module.exports = {
   // QR
   QR_ROTATION_MINUTES: parseInt(process.env.QR_ROTATION_MINUTES || '60'),
 
-  // Time
-  TIMEZONE: process.env.TIMEZONE || 'America/Lima',
+  // Time — Panamá usa GMT-5 fijo (America/Panama), sin horario de verano
+  TIMEZONE: process.env.TIMEZONE || 'America/Panama',
   LATE_HOUR: parseInt(process.env.LATE_HOUR || '8'),
   LATE_MINUTE: parseInt(process.env.LATE_MINUTE || '0'),
 

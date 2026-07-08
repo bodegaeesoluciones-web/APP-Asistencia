@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { todayPanama } from './utils/timezone';
 import { LayoutDashboard, Users, BarChart3, UserCircle2, LogOut, PlusCircle, Download, Settings, Edit2, X, ClipboardList } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from './api';
@@ -70,7 +71,8 @@ function App() {
       setHistory(data);
       
       // Calculate Stats for Today
-      const today = new Date().toISOString().split('T')[0];
+      // Usar hora de Panamá (GMT-5) en vez de UTC para evitar desfase de fecha
+      const today = todayPanama();
       let presentes = 0, tardanzas = 0;
       
       const chartMap = {};
@@ -103,7 +105,9 @@ function App() {
   const loadUsers = async () => {
     try {
       const data = await api.getUsers();
-      setUsers(data);
+      // Filtrar admins en el cliente por si el backend no ha sido actualizado
+      const technicians = data.filter(u => u.role !== 'admin');
+      setUsers(technicians);
     } catch (e) {
       console.error(e);
     }
