@@ -325,3 +325,74 @@ exports.clearTodayAttendance = async (req, res) => {
     res.status(500).json({ error: 'Error al limpiar registros de hoy' });
   }
 };
+
+// === Override Attendance (Manual Edit) ===
+exports.overrideAttendance = async (req, res) => {
+  const { cedula, date, type, time } = req.body;
+  if (!cedula || !date || !type || !time) {
+    return res.status(400).json({ error: 'Faltan parámetros' });
+  }
+
+  try {
+    const settings = await getSettings();
+    const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Panama';
+    
+    // Convert 12h AM/PM to 24h if needed
+    let time24 = time;
+    if (time.includes('AM') || time.includes('PM')) {
+      const parts = time.split(' ');
+      let [h, m] = parts[0].split(':');
+      h = parseInt(h, 10);
+      if (parts[1] === 'PM' && h < 12) h += 12;
+      if (parts[1] === 'AM' && h === 12) h = 0;
+      time24 = `${String(h).padStart(2, '0')}:${m}:00`;
+    }
+    if (time24.split(':').length === 2) time24 += ':00';
+
+    const timestampStr = `${date} ${time24}`; // 'YYYY-MM-DD HH:mm:ss'
+
+    // Get user id from cedula
+    const { rows: users } = await pool.query('SELECT id FROM users WHERE username = $1', [cedula]);
+    if (users.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+    const userId = users[0].id;
+
+    // Check if an attendance record already exists for this date and type
+    const { rows: existing } = await pool.query(
+      `SELECT id FROM attendance 
+       WHERE user_id = $1 AND type = $2 AND DATE(timestamp AT TIME ZONE $3) = $4::date`,
+      [userId, type, TZ, date]
+    );
+
+    if (existing.length > 0) {
+      // Update
+      await pool.query(
+        `UPDATE attendance 
+         SET timestamp = $1::timestamp AT TIME ZONE $3, is_manual_edit = true 
+         WHERE id = $2`,
+        [timestampStr, existing[0].id, TZ]
+      );
+    } else {
+      // Insert
+      await pool.query(
+        `INSERT INTO attendance (user_id, type, timestamp, is_valid, is_manual_edit) 
+         VALUES ($1, $2, $3::timestamp AT TIME ZONE $4, true, true)`,
+        [userId, type, timestampStr, TZ]
+      );
+    }
+
+    // Audit log
+    const { logAudit } = require('../utils/audit');
+    await logAudit({
+      userId: req.user.id,
+      action: 'ADMIN_OVERRIDE_ATTENDANCE',
+      details: { targetCedula: cedula, date, type, newTime: time24, tz: TZ },
+      ipAddress: req.ip,
+      success: true,
+    });
+
+    res.json({ message: 'Asistencia actualizada correctamente' });
+  } catch (err) {
+    console.error('overrideAttendance error:', err);
+    res.status(500).json({ error: 'Error al actualizar asistencia' });
+  }
+};

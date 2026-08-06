@@ -20,6 +20,9 @@ router.delete('/users/:id/devices', adminController.resetUserDevices);
 // Clear today's attendance for a user (emergency reset)
 router.delete('/users/:id/attendance/today', adminController.clearTodayAttendance);
 
+// Manual attendance override
+router.put('/attendance/override', adminController.overrideAttendance);
+
 // Devices
 router.get('/devices', adminController.getDevices);
 router.delete('/devices/:id', adminController.deleteDevice);

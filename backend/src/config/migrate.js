@@ -23,6 +23,12 @@ async function runMigrations() {
         ADD COLUMN IF NOT EXISTS exit_time  VARCHAR(5) DEFAULT '16:30';
     `);
 
+    // Migration 2: Add is_manual_edit to attendance table
+    await client.query(`
+      ALTER TABLE attendance
+        ADD COLUMN IF NOT EXISTS is_manual_edit BOOLEAN DEFAULT false;
+    `);
+
     console.log('✅ Migrations completed successfully.');
   } catch (err) {
     console.error('❌ Migration error:', err.message);

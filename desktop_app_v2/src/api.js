@@ -226,7 +226,7 @@ class APIClient {
         return { success: true, data };
       }
       const err = await res.json();
-      return { success: false, message: err.error || 'Error al resetear dispositivos' };
+      return { success: false, message: err.error || 'Error al resetear dispositivos', details: err.details };
     } catch (e) {
       return { success: false, message: 'Error al comunicarse con el servidor al resetear dispositivo.' };
     }
@@ -280,6 +280,20 @@ class APIClient {
     }
     return false;
   }
+
+  async overrideAttendance(cedula, date, type, time) {
+    const res = await this.request('/admin/attendance/override', {
+      method: 'PUT',
+      body: JSON.stringify({ cedula, date, type, time })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { success: true, data };
+    }
+    const err = await res.json();
+    return { success: false, message: err.error || 'Error al guardar asistencia' };
+  }
+
   async wipeDatabase() {
     // wipe-db is outside /api prefix
     const BASE = API_BASE.replace('/api', '');
