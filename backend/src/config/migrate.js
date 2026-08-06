@@ -5,7 +5,14 @@
 const { pool } = require('./db');
 
 async function runMigrations() {
-  const client = await pool.connect();
+  let client;
+  try {
+    client = await pool.connect();
+  } catch (connErr) {
+    console.warn('⚠️  DB not reachable at startup (will retry on first request):', connErr.message);
+    return; // Don't crash — the pool will reconnect automatically
+  }
+
   try {
     console.log('🔄 Running auto-migrations...');
 

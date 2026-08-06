@@ -185,11 +185,23 @@ exports.deleteUser = async (req, res) => {
 exports.resetUserDevices = async (req, res) => {
   const { id } = req.params;
   try {
+    // Paso 1: Desvincular registros de asistencia del dispositivo
+    // (esto evita el error de FK al borrar el dispositivo)
+    await pool.query('UPDATE attendance SET device_id = NULL WHERE user_id = $1', [id]);
+    
+    // Paso 2: Eliminar el/los dispositivos del usuario
     const { rowCount } = await pool.query('DELETE FROM devices WHERE user_id = $1', [id]);
-    res.json({ message: `Se eliminaron ${rowCount} dispositivo(s) registrados. El colaborador podrá registrar un nuevo dispositivo en su próximo inicio de sesión.`, deleted: rowCount });
+    
+    // Paso 3: Revocar los refresh tokens para forzar nuevo login
+    await pool.query('UPDATE refresh_tokens SET revoked = true WHERE user_id = $1', [id]);
+    
+    res.json({
+      message: `Se eliminaron ${rowCount} dispositivo(s) registrados. El colaborador deberá iniciar sesión nuevamente y registrar su nuevo dispositivo.`,
+      deleted: rowCount
+    });
   } catch (err) {
     console.error('resetUserDevices error:', err);
-    res.status(500).json({ error: 'Error al resetear dispositivos del usuario' });
+    res.status(500).json({ error: 'Error al resetear dispositivos del usuario', details: err.message });
   }
 };
 
@@ -213,10 +225,13 @@ exports.getDevices = async (req, res) => {
 exports.deleteDevice = async (req, res) => {
   const { id } = req.params;
   try {
+    // First nullify attendance records referencing this device (FK constraint)
+    await pool.query('UPDATE attendance SET device_id = NULL WHERE device_id = $1', [id]);
     await pool.query('DELETE FROM devices WHERE id = $1', [id]);
     res.json({ message: 'Dispositivo eliminado' });
   } catch (err) {
-    res.status(500).json({ error: 'Error al eliminar dispositivo' });
+    console.error('deleteDevice error:', err);
+    res.status(500).json({ error: 'Error al eliminar dispositivo', details: err.message });
   }
 };
 

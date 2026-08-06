@@ -195,8 +195,8 @@ async function loadUsers() {
         <td>${escHtml(u.position || '—')}</td>
         <td>${escHtml(u.mobile_number || '—')}</td>
         <td>
-          <span class="badge ${u.status === 'active' ? 'bg-success' : (u.status === 'deleted' ? 'bg-danger' : 'bg-secondary')}">
-            ${u.status === 'active' ? 'Activo' : (u.status === 'deleted' ? 'Eliminado' : 'Inactivo')}
+          <span class="badge ${u.status === 'active' ? 'bg-success' : 'bg-secondary'}">
+            ${u.status === 'active' ? 'Activo' : 'Inactivo'}
           </span>
         </td>
         <td>
@@ -588,7 +588,7 @@ function setupSettingsForm() {
     alertEl.innerHTML = '';
 
     try {
-      await api.put('/api/admin/settings', {
+      await api.put('/admin/settings', {
         base_lat: document.getElementById('set_base_lat').value,
         base_lng: document.getElementById('set_base_lng').value,
         allowed_radius_m: document.getElementById('set_allowed_radius_m').value,
