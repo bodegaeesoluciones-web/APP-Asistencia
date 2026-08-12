@@ -31,7 +31,7 @@ async function getFilteredAttendance(req) {
     SELECT a.id, a.type,
            TO_CHAR(a.timestamp AT TIME ZONE $1, 'YYYY-MM-DD"T"HH24:MI:SS') as local_time,
            a.is_valid, a.rejection_reason, a.latitude, a.longitude,
-           a.photo_url, a.ip_address, a.is_manual_edit,
+           a.photo_url, a.ip_address, a.is_manual_edit, a.manual_status,
            u.full_name as user_name, u.username as cedula, u.position as user_position, u.mobile_number, d.device_name
     FROM attendance a
     JOIN users u ON a.user_id = u.id

@@ -337,17 +337,25 @@ exports.overrideAttendance = async (req, res) => {
     const settings = await getSettings();
     const TZ = (settings.timezone && settings.timezone.trim()) ? settings.timezone.trim() : 'America/Panama';
     
-    // Convert 12h AM/PM to 24h if needed
     let time24 = time;
-    if (time.includes('AM') || time.includes('PM')) {
-      const parts = time.split(' ');
-      let [h, m] = parts[0].split(':');
-      h = parseInt(h, 10);
-      if (parts[1] === 'PM' && h < 12) h += 12;
-      if (parts[1] === 'AM' && h === 12) h = 0;
-      time24 = `${String(h).padStart(2, '0')}:${m}:00`;
+    let manualStatus = null;
+    const specialStatuses = ['Ausente', 'Incapacitado', 'Suspendido'];
+
+    if (specialStatuses.includes(time)) {
+      time24 = '00:00:00';
+      manualStatus = time;
+    } else {
+      // Convert 12h AM/PM to 24h if needed
+      if (time.includes('AM') || time.includes('PM')) {
+        const parts = time.split(' ');
+        let [h, m] = parts[0].split(':');
+        h = parseInt(h, 10);
+        if (parts[1] === 'PM' && h < 12) h += 12;
+        if (parts[1] === 'AM' && h === 12) h = 0;
+        time24 = `${String(h).padStart(2, '0')}:${m}:00`;
+      }
+      if (time24.split(':').length === 2) time24 += ':00';
     }
-    if (time24.split(':').length === 2) time24 += ':00';
 
     const timestampStr = `${date} ${time24}`; // 'YYYY-MM-DD HH:mm:ss'
 
@@ -367,16 +375,16 @@ exports.overrideAttendance = async (req, res) => {
       // Update
       await pool.query(
         `UPDATE attendance 
-         SET timestamp = $1::timestamp AT TIME ZONE $3, is_manual_edit = true 
+         SET timestamp = $1::timestamp AT TIME ZONE $3, is_manual_edit = true, manual_status = $4 
          WHERE id = $2`,
-        [timestampStr, existing[0].id, TZ]
+        [timestampStr, existing[0].id, TZ, manualStatus]
       );
     } else {
       // Insert
       await pool.query(
-        `INSERT INTO attendance (user_id, type, timestamp, is_valid, is_manual_edit) 
-         VALUES ($1, $2, $3::timestamp AT TIME ZONE $4, true, true)`,
-        [userId, type, timestampStr, TZ]
+        `INSERT INTO attendance (user_id, type, timestamp, is_valid, is_manual_edit, manual_status) 
+         VALUES ($1, $2, $3::timestamp AT TIME ZONE $4, true, true, $5)`,
+        [userId, type, timestampStr, TZ, manualStatus]
       );
     }
 
