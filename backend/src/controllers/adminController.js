@@ -66,6 +66,7 @@ exports.getDashboard = async (req, res) => {
 exports.getUsers = async (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
   const offset = parseInt(req.query.offset) || 0;
+  console.log(`[getUsers API] Called by user ${req.user?.id} (${req.user?.role}). Limit: ${limit}, Offset: ${offset}`);
   try {
     const { rows } = await pool.query(
       `SELECT id, username, full_name, role, status, mobile_number, position,
@@ -78,8 +79,10 @@ exports.getUsers = async (req, res) => {
       [limit, offset]
     );
     const { rows: countRows } = await pool.query("SELECT count(*) FROM users WHERE role != 'admin'");
+    console.log(`[getUsers API] Returning ${rows.length} users. Total: ${countRows[0].count}`);
     res.json({ users: rows, total: parseInt(countRows[0].count, 10) });
   } catch (err) {
+    console.error('[getUsers API] Error:', err);
     res.status(500).json({ error: 'Error al obtener usuarios' });
   }
 };
