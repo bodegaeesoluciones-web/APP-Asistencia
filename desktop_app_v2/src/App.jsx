@@ -105,9 +105,9 @@ function App() {
   const loadUsers = async () => {
     try {
       const data = await api.getUsers();
-      // Filtrar admins en el cliente por si el backend no ha sido actualizado
-      const technicians = data.filter(u => u.role !== 'admin');
-      setUsers(technicians);
+      // Filtrar admins (el backend ya no los incluye, pero por seguridad filtramos también aquí)
+      const collaborators = data.filter(u => u.role !== 'admin');
+      setUsers(collaborators);
     } catch (e) {
       console.error(e);
     }

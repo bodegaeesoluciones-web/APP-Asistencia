@@ -13,7 +13,7 @@ exports.getDashboard = async (req, res) => {
 
     // Total active technicians
     const { rows: techRows } = await pool.query(
-      "SELECT count(*) FROM users WHERE role = 'technician' AND status = 'active'"
+      "SELECT count(*) FROM users WHERE role != 'admin' AND status = 'active'"
     );
     const totalTechnicians = parseInt(techRows[0].count, 10);
 
@@ -73,11 +73,11 @@ exports.getUsers = async (req, res) => {
               entry_time, exit_time,
               created_at 
        FROM users 
-       WHERE role = 'technician'
+       WHERE role != 'admin'
        ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-    const { rows: countRows } = await pool.query("SELECT count(*) FROM users WHERE role = 'technician'");
+    const { rows: countRows } = await pool.query("SELECT count(*) FROM users WHERE role != 'admin'");
     res.json({ users: rows, total: parseInt(countRows[0].count, 10) });
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener usuarios' });
