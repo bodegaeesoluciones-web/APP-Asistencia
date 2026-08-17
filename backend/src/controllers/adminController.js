@@ -80,6 +80,12 @@ exports.getUsers = async (req, res) => {
     );
     const { rows: countRows } = await pool.query("SELECT count(*) FROM users WHERE role != 'admin'");
     console.log(`[getUsers API] Returning ${rows.length} users. Total: ${countRows[0].count}`);
+    
+    // Forzar a la app de escritorio a NO usar caché
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
     res.json({ users: rows, total: parseInt(countRows[0].count, 10) });
   } catch (err) {
     console.error('[getUsers API] Error:', err);
