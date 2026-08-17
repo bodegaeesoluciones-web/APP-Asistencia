@@ -813,6 +813,15 @@
     }
     function clearAlert() { $('alertContainer').innerHTML = ''; }
 
+    // Detección de navegadores internos (WhatsApp, Facebook, etc.)
+    function detectWebView() {
+      const ua = navigator.userAgent || navigator.vendor || window.opera;
+      if (ua.indexOf('FBAV') > -1 || ua.indexOf('FBAN') > -1 || ua.indexOf('Instagram') > -1 || ua.indexOf('WhatsApp') > -1) {
+        showAlert('Estás abriendo el sistema desde una aplicación (WhatsApp/Facebook). Si tienes problemas con los permisos, por favor COPIA EL ENLACE y ábrelo directamente en Google Chrome o Safari.', 'warning');
+      }
+    }
+    detectWebView();
+
     // ── Configuration ──
     const API_BASE = '/api';
 
@@ -937,9 +946,9 @@
             $('gpsLocationText').textContent = '';
             $('btnMark').disabled = true;  // ← MANTENER deshabilitado sin GPS real
             if (err.code === 1)
-              showAlert('Permiso de ubicación denegado. Actívalo en los ajustes del navegador.', 'error');
+              showAlert('⚠️ Permiso de UBICACIÓN DENEGADO. Para solucionarlo: Ve a Ajustes > Aplicaciones > Tu Navegador (ej. Chrome) > Permisos, y ACTIVA la Ubicación. Si estás en WhatsApp, abre el enlace en Google Chrome.', 'error');
             else
-              showAlert('No se pudo obtener GPS. Verifica que el GPS esté encendido y espera unos segundos.', 'warning');
+              showAlert('⚠️ No se pudo obtener GPS. Verifica que el GPS de tu celular esté encendido y espera unos segundos al aire libre.', 'warning');
           }
         },
         // maximumAge: 0 → siempre posición fresca, sin caché
@@ -1074,9 +1083,9 @@
       } catch (err) {
         closeCameraModal();
         if (err.name === 'NotAllowedError') {
-          showAlert('Permiso de cámara denegado. Por favor, activa la cámara en ajustes del navegador.', 'error');
+          showAlert('⚠️ Permiso de CÁMARA DENEGADO. Para solucionarlo: Ve a Ajustes > Aplicaciones > Tu Navegador (ej. Chrome) > Permisos, y ACTIVA la Cámara. Si usas WhatsApp, copia el enlace y ábrelo en Google Chrome.', 'error');
         } else {
-          showAlert(`Error de cámara: ${err.message}`, 'error');
+          showAlert(`⚠️ Error de cámara: ${err.message}. Si estás en una app (WhatsApp/Facebook), copia el enlace y ábrelo en tu navegador principal (Chrome/Safari).`, 'error');
         }
       }
     }

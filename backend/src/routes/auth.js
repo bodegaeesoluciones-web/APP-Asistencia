@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const { authLimiter } = require('../middleware/rateLimiter');
 const { authenticateToken } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 
@@ -15,7 +14,6 @@ const validateRequest = (req, res, next) => {
 
 router.post(
   '/login',
-  authLimiter,
   [
     body('username').notEmpty().withMessage('Username es requerido'),
     body('password').notEmpty().withMessage('Password es requerido'),
@@ -27,7 +25,6 @@ router.post(
 
 router.post(
   '/refresh',
-  authLimiter,
   [
     body('refreshToken').notEmpty().withMessage('Refresh Token es requerido'),
     body('userId').notEmpty().withMessage('User ID es requerido'),

@@ -37,7 +37,15 @@ export default function LiveDashboard({ users, stats }) {
   const absentUsers = Math.max(0, totalUsers - uniqueUsersToday);
   const entries = attendance.filter(a => a.type === 'entry').length;
   const exits = attendance.filter(a => a.type === 'exit').length;
-  const lates = attendance.filter(a => a.type === 'entry' && !a.is_valid).length;
+  const lates = attendance.filter(a => {
+    if (a.type !== 'entry') return false;
+    if (!a.local_time) return false;
+    if (!a.is_valid) return true;
+    const u = users.find(user => (user.full_name === a.user_name || user.id === a.user_id));
+    const scheduledEntry = u ? (u.entry_time || '07:30') : '07:30';
+    const rawTimeStr = a.local_time.split('T')[1].slice(0, 5);
+    return rawTimeStr > scheduledEntry;
+  }).length;
 
   const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6'];
   const pieData = [

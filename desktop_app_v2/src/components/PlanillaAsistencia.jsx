@@ -150,14 +150,22 @@ function exportToExcel(rows, days, monthLabel) {
     days.forEach(d => {
       const rec = row.days[d.date] || {};
       const bg = d.isWeekend ? C.wkndData : rowBg;
-      const entVal = rec.entry || '00:00';
-      const salVal = rec.exit || '00:00';
+      let entVal = rec.entry || '00:00';
+      if (entVal === 'Ausente') entVal = 'AUS';
+      if (entVal === 'Incapacitado') entVal = 'INC';
+      if (entVal === 'Suspendido') entVal = 'SUS';
+
+      let salVal = rec.exit || '00:00';
+      if (salVal === 'Ausente') salVal = 'AUS';
+      if (salVal === 'Incapacitado') salVal = 'INC';
+      if (salVal === 'Suspendido') salVal = 'SUS';
+
       const entFg = rec._entryEdited ? C.editedFg : (rec.entry ? C.entryFg : C.emptyFg);
       const salFg = rec._exitEdited ? C.editedFg : (rec.exit ? C.exitFg : C.emptyFg);
       vals.push(entVal, salVal);
       stys.push(
-        mkStyle(bg, entFg, !!rec.entry, 9, 'center', false),
-        mkStyle(bg, salFg, !!rec.exit, 9, 'center', false)
+        mkStyle(bg, ['AUS','INC','SUS'].includes(entVal) ? 'B91C1C' : entFg, !!rec.entry, 9, 'center', false),
+        mkStyle(bg, ['AUS','INC','SUS'].includes(salVal) ? 'B91C1C' : salFg, !!rec.exit, 9, 'center', false)
       );
     });
 
@@ -189,38 +197,48 @@ function exportToExcel(rows, days, monthLabel) {
 }
 
 // ─── Inline Time Cell ────────────────────────────────────────────────────────
-// Celda que muestra la hora y al hacer doble clic permite editarla con un input de tiempo
 function TimeCell({ value, isEdited, color, bg, onSave, type }) {
   const [editing, setEditing] = useState(false);
+  const [editMode, setEditMode] = useState('time');
   const [inputVal, setInputVal] = useState('');
+  const [statusVal, setStatusVal] = useState('Ausente');
   const inputRef = useRef(null);
 
+  const specialStatuses = ['Ausente', 'Incapacitado', 'Suspendido'];
+
   const startEdit = useCallback(() => {
-    // Convertir el valor actual a formato 24h para el input type="time"
     let v24 = '';
-    if (value) {
-      const mins = timeToMinutes(value);
-      if (mins !== null) {
-        const h = Math.floor(mins / 60);
-        const m = mins % 60;
-        v24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    if (value && specialStatuses.includes(value)) {
+      setEditMode('status');
+      setStatusVal(value);
+    } else {
+      setEditMode('time');
+      if (value) {
+        const mins = timeToMinutes(value);
+        if (mins !== null) {
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          v24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
       }
+      setInputVal(v24);
     }
-    setInputVal(v24);
     setEditing(true);
   }, [value]);
 
   useEffect(() => {
-    if (editing && inputRef.current) {
+    if (editing && editMode === 'time' && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.showPicker?.();
     }
-  }, [editing]);
+  }, [editing, editMode]);
 
   const handleSave = () => {
     setEditing(false);
-    if (inputVal) {
+    if (editMode === 'time' && inputVal) {
       onSave(to12h(inputVal));
+    } else if (editMode === 'status' && statusVal) {
+      onSave(statusVal);
     }
   };
 
@@ -229,25 +247,64 @@ function TimeCell({ value, isEdited, color, bg, onSave, type }) {
     if (e.key === 'Escape') { setEditing(false); }
   };
 
+  const handleBlur = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      handleSave();
+    }
+  };
+
   if (editing) {
     return (
-      <td style={{ padding: '0.1rem', textAlign: 'center', background: 'rgba(37,99,235,0.12)', border: '1.5px solid #2563EB' }}>
-        <input
-          ref={inputRef}
-          type="time"
-          value={inputVal}
-          onChange={e => setInputVal(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          style={{
-            width: '72px', background: 'transparent', border: 'none', color: '#93c5fd',
-            fontSize: '0.72rem', fontWeight: '700', textAlign: 'center', outline: 'none',
-            padding: '0.1rem',
-          }}
-        />
+      <td style={{ padding: '0.1rem', textAlign: 'center', background: 'rgba(37,99,235,0.12)', border: '1.5px solid #2563EB', position: 'relative', zIndex: 50 }}>
+        <div 
+          onBlur={handleBlur}
+          tabIndex={-1}
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center', outline: 'none' }}
+        >
+          <select 
+            value={editMode} 
+            onChange={e => { setEditMode(e.target.value); if (e.target.value === 'time') { setInputVal(''); } else { setStatusVal('Ausente'); } }}
+            style={{ fontSize: '0.65rem', padding: '0.1rem', background: '#1e293b', color: 'white', border: '1px solid #334155', borderRadius: '4px', outline: 'none' }}
+          >
+            <option value="time">Hora</option>
+            <option value="status">Estado</option>
+          </select>
+          
+          {editMode === 'time' ? (
+            <input
+              ref={inputRef}
+              type="time"
+              value={inputVal}
+              onChange={e => setInputVal(e.target.value)}
+              onKeyDown={handleKeyDown}
+              style={{
+                width: '72px', background: 'transparent', border: 'none', color: '#93c5fd',
+                fontSize: '0.72rem', fontWeight: '700', textAlign: 'center', outline: 'none',
+                padding: '0.1rem',
+              }}
+            />
+          ) : (
+            <select
+              value={statusVal}
+              onChange={e => setStatusVal(e.target.value)}
+              onKeyDown={handleKeyDown}
+              style={{ fontSize: '0.65rem', padding: '0.1rem', background: '#1e293b', color: '#f87171', border: '1px solid #334155', borderRadius: '4px', outline: 'none' }}
+              autoFocus
+            >
+              <option value="Ausente">Ausente</option>
+              <option value="Incapacitado">Incapacitado</option>
+              <option value="Suspendido">Suspendido</option>
+            </select>
+          )}
+        </div>
       </td>
     );
   }
+
+  let displayValue = value || '—';
+  if (value === 'Ausente') displayValue = 'AUS';
+  if (value === 'Incapacitado') displayValue = 'INC';
+  if (value === 'Suspendido') displayValue = 'SUS';
 
   return (
     <td
@@ -268,7 +325,7 @@ function TimeCell({ value, isEdited, color, bg, onSave, type }) {
         transition: 'background 0.1s',
       }}
     >
-      {value || '—'}
+      {displayValue}
       {isEdited && (
         <span style={{
           position: 'absolute', top: 0, right: 1,
@@ -347,10 +404,10 @@ export default function PlanillaAsistencia({ users }) {
       if (!lookup[cedula][dateKey]) lookup[cedula][dateKey] = { entry: null, exit: null, entryEdited: false, exitEdited: false };
       const timeStr = formatTimeFromLocalStr(rec.local_time);
       if (rec.type === 'entry') {
-        lookup[cedula][dateKey].entry = timeStr;
+        lookup[cedula][dateKey].entry = rec.manual_status || timeStr;
         lookup[cedula][dateKey].entryEdited = rec.is_manual_edit;
       } else {
-        lookup[cedula][dateKey].exit = timeStr;
+        lookup[cedula][dateKey].exit = rec.manual_status || timeStr;
         lookup[cedula][dateKey].exitEdited = rec.is_manual_edit;
       }
     });
@@ -537,12 +594,12 @@ export default function PlanillaAsistencia({ users }) {
                       const hasEntry = !!rec.entry;
                       const hasExit = !!rec.exit;
 
-                      const entryColor = hasEntry ? (isLate ? '#ef4444' : '#10b981') : 'rgba(255,255,255,0.2)';
-                      const exitColor = hasExit ? '#f59e0b' : 'rgba(255,255,255,0.2)';
-                      const entryBg = hasEntry
+                      const entryColor = ['Ausente', 'Incapacitado', 'Suspendido'].includes(rec.entry) ? '#f87171' : (hasEntry ? (isLate ? '#ef4444' : '#10b981') : 'rgba(255,255,255,0.2)');
+                      const exitColor = ['Ausente', 'Incapacitado', 'Suspendido'].includes(rec.exit) ? '#f87171' : (hasExit ? '#f59e0b' : 'rgba(255,255,255,0.2)');
+                      const entryBg = ['Ausente', 'Incapacitado', 'Suspendido'].includes(rec.entry) ? 'rgba(239,68,68,0.08)' : (hasEntry
                         ? (isLate ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.06)')
-                        : day.isWeekend ? 'rgba(99,102,241,0.04)' : 'transparent';
-                      const exitBg = hasExit ? 'rgba(245,158,11,0.06)' : day.isWeekend ? 'rgba(99,102,241,0.04)' : 'transparent';
+                        : day.isWeekend ? 'rgba(99,102,241,0.04)' : 'transparent');
+                      const exitBg = ['Ausente', 'Incapacitado', 'Suspendido'].includes(rec.exit) ? 'rgba(239,68,68,0.08)' : (hasExit ? 'rgba(245,158,11,0.06)' : day.isWeekend ? 'rgba(99,102,241,0.04)' : 'transparent');
 
                       return (
                         <React.Fragment key={day.date + '_cell'}>

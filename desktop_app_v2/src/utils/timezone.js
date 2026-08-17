@@ -46,7 +46,14 @@ export function formatTimeFromLocalStr(localTimeStr) {
   // Extraer HH:MM directamente del string para evitar reinterpretación
   const timePart = localTimeStr.split('T')[1];
   if (!timePart) return '--:--';
-  return timePart.slice(0, 5); // 'HH:MM'
+  
+  const hh = parseInt(timePart.slice(0, 2), 10);
+  const mm = timePart.slice(3, 5);
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  const hh12 = hh % 12 || 12;
+  const hh12Str = hh12.toString().padStart(2, '0');
+  
+  return `${hh12Str}:${mm} ${ampm}`;
 }
 
 /**

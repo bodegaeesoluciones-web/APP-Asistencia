@@ -62,12 +62,42 @@ export default function AttendanceMatrix({ users }) {
   
   const processedData = useMemo(() => {
     const map = new Map();
+    const sDate = dateRange.start || todayPanama();
+    const eDate = dateRange.end || todayPanama();
+
+    // Pre-cargar todos los usuarios si estamos viendo un solo día
+    if (sDate === eDate && users) {
+      users.forEach(u => {
+        if (u.role === 'admin' || u.status === 'inactive') return;
+        const key = `${u.full_name || u.id}_${sDate}`;
+        map.set(key, {
+          id: key,
+          name: u.full_name || 'Desconocido',
+          cedula: u.username || '--',
+          position: u.position || 'Técnico',
+          date: sDate,
+          entry_time: null,
+          exit_time: null,
+          status: 'Pendiente',
+          distance: '--',
+          ip_address: '--',
+          device_name: '--',
+          photo_entry: null,
+          photo_exit: null,
+          is_valid: true,
+          rejection_reason: null,
+          scheduled_entry: u.entry_time || '07:30',
+          scheduled_exit: u.exit_time || '16:30'
+        });
+      });
+    }
 
     attendance.forEach(rec => {
       const date = extractDateFromLocalStr(rec.local_time);
       const key = `${rec.user_name || rec.user_id}_${date}`;
       
       if (!map.has(key)) {
+        const u = users?.find(user => (user.full_name === rec.user_name || user.id === rec.user_id));
         map.set(key, {
           id: key,
           name: rec.user_name || 'Desconocido',
@@ -76,23 +106,27 @@ export default function AttendanceMatrix({ users }) {
           date: date,
           entry_time: null,
           exit_time: null,
-          status: 'Ausente',
+          status: 'Pendiente',
           distance: rec.latitude ? `Lat: ${parseFloat(rec.latitude).toFixed(4)}, Lng: ${parseFloat(rec.longitude).toFixed(4)}` : '--',
           ip_address: rec.ip_address || '--',
           device_name: rec.device_name || '--',
           photo_entry: null,
           photo_exit: null,
           is_valid: true,
-          rejection_reason: null
+          rejection_reason: null,
+          scheduled_entry: u ? (u.entry_time || '07:30') : '07:30',
+          scheduled_exit: u ? (u.exit_time || '16:30') : '16:30'
         });
       }
 
       const row = map.get(key);
       // Extraer la hora directamente del string para no re-interpretar con timezone del PC
       const timeStr = formatTimeFromLocalStr(rec.local_time);
+      const rawTimeStr = rec.local_time.split('T')[1].slice(0, 5); // '08:00'
       
       if (rec.type === 'entry') {
         row.entry_time = timeStr;
+        row.raw_entry = rawTimeStr;
         row.photo_entry = rec.photo_url;
         row.is_valid = row.is_valid && rec.is_valid;
         if (!rec.is_valid) row.rejection_reason = rec.rejection_reason;
@@ -102,11 +136,34 @@ export default function AttendanceMatrix({ users }) {
         if (rec.device_name) row.device_name = rec.device_name;
       } else {
         row.exit_time = timeStr;
+        row.raw_exit = rawTimeStr;
         row.photo_exit = rec.photo_url;
       }
+    });
 
-      row.status = row.entry_time && !row.exit_time ? 'Presente' : row.entry_time && row.exit_time ? 'Completado' : 'Ausente';
-      if (!row.is_valid) row.status = 'Tardanza/Fuera Rango';
+    const nowTz = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Panama' }));
+    const currentHhMm = nowTz.getHours().toString().padStart(2, '0') + ':' + nowTz.getMinutes().toString().padStart(2, '0');
+    const todayStr = todayPanama();
+
+    map.forEach(row => {
+      let isLate = false;
+      if (row.raw_entry && row.raw_entry > row.scheduled_entry) {
+        isLate = true;
+      }
+
+      if (row.entry_time && !row.exit_time) {
+        row.status = isLate ? 'Tardanza' : 'Presente';
+      } else if (row.entry_time && row.exit_time) {
+        row.status = isLate ? 'Completado (Tardanza)' : 'Completado';
+      } else {
+        if (row.date < todayStr || (row.date === todayStr && currentHhMm > row.scheduled_entry)) {
+          row.status = 'Ausente';
+        } else {
+          row.status = 'Pendiente';
+        }
+      }
+
+      if (!row.is_valid && row.entry_time) row.status = 'Fuera de Rango';
     });
 
     let result = Array.from(map.values());
@@ -165,7 +222,11 @@ export default function AttendanceMatrix({ users }) {
             <option value="All" style={{color: 'black'}}>Todos los Estados</option>
             <option value="Presente" style={{color: 'black'}}>Presente</option>
             <option value="Completado" style={{color: 'black'}}>Completado</option>
-            <option value="Tardanza/Fuera Rango" style={{color: 'black'}}>Tardanza/Fuera Rango</option>
+            <option value="Tardanza" style={{color: 'black'}}>Tardanza</option>
+            <option value="Completado (Tardanza)" style={{color: 'black'}}>Completado (Tardanza)</option>
+            <option value="Ausente" style={{color: 'black'}}>Ausente</option>
+            <option value="Pendiente" style={{color: 'black'}}>Pendiente</option>
+            <option value="Fuera de Rango" style={{color: 'black'}}>Fuera de Rango</option>
           </select>
         </div>
 
@@ -212,7 +273,7 @@ export default function AttendanceMatrix({ users }) {
                     <td style={{ padding: '0.75rem 1rem', fontWeight: '500' }}>{row.name}</td>
                     <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace' }}>{row.cedula}</td>
                     <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{row.position}</td>
-                    <td style={{ padding: '0.75rem 1rem' }}>{new Date(row.date).toLocaleDateString('es-ES')}</td>
+                    <td style={{ padding: '0.75rem 1rem' }}>{new Date(row.date + 'T12:00:00').toLocaleDateString('es-ES')}</td>
                     <td style={{ padding: '0.75rem 1rem', fontWeight: '600', color: row.entry_time ? '#10b981' : 'var(--text-muted)' }}>{row.entry_time || '--:--'}</td>
                     <td style={{ padding: '0.75rem 1rem', fontWeight: '600', color: row.exit_time ? '#f59e0b' : 'var(--text-muted)' }}>{row.exit_time || '--:--'}</td>
                     <td style={{ padding: '0.75rem 1rem' }}>

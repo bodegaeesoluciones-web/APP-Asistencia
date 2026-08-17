@@ -63,21 +63,27 @@ export default function UserManagement({ users, setUsers }) {
       exit_time: payload.exit_time || '16:30',
     };
 
-    if (isEdit) {
-      if (!dataToSend.password) delete dataToSend.password;
-      res = await api.updateUser(modalData.id, dataToSend);
-    } else {
-      res = await api.createUser(modalData);
-    }
+    try {
+      if (isEdit) {
+        if (!dataToSend.password) delete dataToSend.password;
+        res = await api.updateUser(modalData.id, dataToSend);
+      } else {
+        res = await api.createUser(modalData);
+      }
 
-    if (res.success) {
-      const freshUsers = await api.getUsers();
-      setUsers(freshUsers);
-      setModalData(null);
-    } else {
-      alert('Error: ' + res.message);
+      if (res && res.success) {
+        const freshUsers = await api.getUsers();
+        setUsers(freshUsers);
+        setModalData(null);
+      } else {
+        alert('Error: ' + (res?.message || 'Ocurrió un error inesperado al guardar.'));
+      }
+    } catch (err) {
+      console.error('Error in handleSave:', err);
+      alert('Error inesperado de red o servidor al guardar el colaborador.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // Reset device handler
@@ -95,7 +101,8 @@ export default function UserManagement({ users, setUsers }) {
     if (res.success) {
       alert(`✅ ${res.data.message}`);
     } else {
-      alert('Error: ' + res.message);
+      const detailStr = res.details ? `\nDetalles del error: ${res.details}` : '';
+      alert(`Error: ${res.message}${detailStr}`);
     }
   };
 
