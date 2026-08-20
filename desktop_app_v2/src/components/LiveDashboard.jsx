@@ -32,13 +32,17 @@ export default function LiveDashboard({ users, stats }) {
   }, []);
 
   // Compute daily metrics from attendance
-  const uniqueUsersToday = new Set(attendance.map(a => a.user_id || a.user_name)).size;
+  const presentUsersToday = new Set(
+    attendance.filter(a => a.manual_status !== 'Ausente' && a.manual_status !== 'Incapacitado' && a.manual_status !== 'Suspendido')
+      .map(a => a.user_id || a.user_name)
+  ).size;
   const totalUsers = users.length;
-  const absentUsers = Math.max(0, totalUsers - uniqueUsersToday);
-  const entries = attendance.filter(a => a.type === 'entry').length;
-  const exits = attendance.filter(a => a.type === 'exit').length;
+  const absentUsers = Math.max(0, totalUsers - presentUsersToday);
+  const entries = attendance.filter(a => a.type === 'entry' && !['Ausente', 'Incapacitado', 'Suspendido'].includes(a.manual_status)).length;
+  const exits = attendance.filter(a => a.type === 'exit' && !['Ausente', 'Incapacitado', 'Suspendido'].includes(a.manual_status)).length;
   const lates = attendance.filter(a => {
     if (a.type !== 'entry') return false;
+    if (['Ausente', 'Incapacitado', 'Suspendido'].includes(a.manual_status)) return false;
     if (!a.local_time) return false;
     if (!a.is_valid) return true;
     const u = users.find(user => (user.full_name === a.user_name || user.id === a.user_id));
@@ -49,7 +53,7 @@ export default function LiveDashboard({ users, stats }) {
 
   const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6'];
   const pieData = [
-    { name: 'Presentes', value: uniqueUsersToday },
+    { name: 'Presentes', value: presentUsersToday },
     { name: 'Ausentes', value: absentUsers }
   ];
 
@@ -71,7 +75,7 @@ export default function LiveDashboard({ users, stats }) {
             <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Presentes Hoy</span>
             <UserCheck size={20} color="var(--success)" />
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--success)' }}>{uniqueUsersToday}</div>
+          <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--success)' }}>{presentUsersToday}</div>
         </div>
 
         <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

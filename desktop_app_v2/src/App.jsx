@@ -105,14 +105,19 @@ function App() {
   const loadUsers = async () => {
     try {
       const data = await api.getUsers();
+      console.log('[loadUsers] respuesta del backend:', data?.length, 'usuarios');
+      if (!data || data.length === 0) {
+        console.warn('[loadUsers] El backend devolvió 0 usuarios. Verificar token y endpoint.');
+      }
       // Filtrar admins (el backend ya no los incluye, pero por seguridad filtramos también aquí)
       const collaborators = data.filter(u => u.role !== 'admin');
       setUsers(collaborators);
     } catch (e) {
-      console.error(e);
+      console.error('[loadUsers] Error al cargar usuarios:', e);
     }
   };
 
+  // Cargar historial y usuarios al autenticarse
   useEffect(() => {
     if (isAuthenticated) {
       loadHistory();
@@ -123,7 +128,14 @@ function App() {
       }, 30000);
       return () => clearInterval(poll);
     }
-  }, [isAuthenticated, activeTab]);
+  }, [isAuthenticated]);
+
+  // Recargar usuarios al cambiar a las tabs que los necesitan
+  useEffect(() => {
+    if (isAuthenticated && (activeTab === 'technicians' || activeTab === 'planilla' || activeTab === 'dashboard')) {
+      loadUsers();
+    }
+  }, [activeTab]);
 
   const handleLogout = () => {
     api.clearSession();

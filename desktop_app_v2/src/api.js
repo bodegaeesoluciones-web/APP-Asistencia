@@ -259,9 +259,9 @@ class APIClient {
   }
 
   async exportExcel(startDate, endDate) {
-    let url = '/reports/export/excel';
+    let url = '/reports/export/excel?desktopFormat=true';
     if (startDate && endDate) {
-      url += `?startDate=${startDate}&endDate=${endDate}`;
+      url += `&startDate=${startDate}&endDate=${endDate}`;
     }
     const res = await this.request(url, {
       headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }

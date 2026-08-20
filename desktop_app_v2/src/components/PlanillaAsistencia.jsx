@@ -402,7 +402,15 @@ export default function PlanillaAsistencia({ users }) {
       const cedula = rec.cedula;
       if (!lookup[cedula]) lookup[cedula] = {};
       if (!lookup[cedula][dateKey]) lookup[cedula][dateKey] = { entry: null, exit: null, entryEdited: false, exitEdited: false };
-      const timeStr = formatTimeFromLocalStr(rec.local_time);
+      let timeStr = formatTimeFromLocalStr(rec.local_time);
+      const rawTimeStr = rec.local_time.split('T')[1].slice(0, 5); // '08:00'
+      
+      // Override default times (visual only)
+      if (rec.type === 'entry' && rawTimeStr >= '07:00' && rawTimeStr <= '07:40') {
+        timeStr = '07:30 AM';
+      } else if (rec.type === 'exit' && rawTimeStr >= '16:00' && rawTimeStr <= '16:59') {
+        timeStr = '04:30 PM';
+      }
       if (rec.type === 'entry') {
         lookup[cedula][dateKey].entry = rec.manual_status || timeStr;
         lookup[cedula][dateKey].entryEdited = rec.is_manual_edit;

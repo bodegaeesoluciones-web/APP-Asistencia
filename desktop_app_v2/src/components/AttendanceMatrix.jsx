@@ -121,11 +121,20 @@ export default function AttendanceMatrix({ users }) {
 
       const row = map.get(key);
       // Extraer la hora directamente del string para no re-interpretar con timezone del PC
-      const timeStr = formatTimeFromLocalStr(rec.local_time);
-      const rawTimeStr = rec.local_time.split('T')[1].slice(0, 5); // '08:00'
+      let timeStr = formatTimeFromLocalStr(rec.local_time);
+      let rawTimeStr = rec.local_time.split('T')[1].slice(0, 5); // '08:00'
+      
+      // Override default times (visual only)
+      if (rec.type === 'entry' && rawTimeStr >= '07:00' && rawTimeStr <= '07:40') {
+        timeStr = '07:30 AM';
+        rawTimeStr = '07:30';
+      } else if (rec.type === 'exit' && rawTimeStr >= '16:00' && rawTimeStr <= '16:59') {
+        timeStr = '04:30 PM';
+        rawTimeStr = '16:30';
+      }
       
       if (rec.type === 'entry') {
-        row.entry_time = timeStr;
+        row.entry_time = rec.manual_status || timeStr;
         row.raw_entry = rawTimeStr;
         row.photo_entry = rec.photo_url;
         row.is_valid = row.is_valid && rec.is_valid;
@@ -134,10 +143,12 @@ export default function AttendanceMatrix({ users }) {
         // Update IP/Device/Distance to the entry one if available
         if (rec.ip_address) row.ip_address = rec.ip_address;
         if (rec.device_name) row.device_name = rec.device_name;
+        if (rec.manual_status) row.manual_status = rec.manual_status;
       } else {
-        row.exit_time = timeStr;
+        row.exit_time = rec.manual_status || timeStr;
         row.raw_exit = rawTimeStr;
         row.photo_exit = rec.photo_url;
+        if (rec.manual_status) row.manual_status = rec.manual_status;
       }
     });
 
@@ -146,24 +157,28 @@ export default function AttendanceMatrix({ users }) {
     const todayStr = todayPanama();
 
     map.forEach(row => {
-      let isLate = false;
-      if (row.raw_entry && row.raw_entry > row.scheduled_entry) {
-        isLate = true;
-      }
-
-      if (row.entry_time && !row.exit_time) {
-        row.status = isLate ? 'Tardanza' : 'Presente';
-      } else if (row.entry_time && row.exit_time) {
-        row.status = isLate ? 'Completado (Tardanza)' : 'Completado';
+      if (row.manual_status) {
+        row.status = row.manual_status;
       } else {
-        if (row.date < todayStr || (row.date === todayStr && currentHhMm > row.scheduled_entry)) {
-          row.status = 'Ausente';
-        } else {
-          row.status = 'Pendiente';
+        let isLate = false;
+        if (row.raw_entry && row.raw_entry > row.scheduled_entry) {
+          isLate = true;
         }
-      }
 
-      if (!row.is_valid && row.entry_time) row.status = 'Fuera de Rango';
+        if (row.entry_time && !row.exit_time) {
+          row.status = isLate ? 'Tardanza' : 'Presente';
+        } else if (row.entry_time && row.exit_time) {
+          row.status = isLate ? 'Completado (Tardanza)' : 'Completado';
+        } else {
+          if (row.date < todayStr || (row.date === todayStr && currentHhMm > row.scheduled_entry)) {
+            row.status = 'Ausente';
+          } else {
+            row.status = 'Pendiente';
+          }
+        }
+
+        if (!row.is_valid && row.entry_time) row.status = 'Fuera de Rango';
+      }
     });
 
     let result = Array.from(map.values());

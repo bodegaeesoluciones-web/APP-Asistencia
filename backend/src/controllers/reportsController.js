@@ -104,13 +104,28 @@ exports.exportExcel = async (req, res) => {
     headerRow.height = 30;
 
     // Llenar datos y estilizar filas
+    const desktopFormat = req.query.desktopFormat === 'true';
+
     records.forEach((r, index) => {
       const isEntry = r.type === 'entry';
       const isValid = r.is_valid;
       
+      let horaStr = new Date(r.local_time).toLocaleTimeString('es-ES', { timeZone: tz });
+      if (desktopFormat) {
+        const timePart = r.local_time.split('T')[1];
+        if (timePart) {
+           const hhmm = timePart.substring(0, 5);
+           if (isEntry && hhmm >= '07:00' && hhmm <= '07:40') {
+              horaStr = '7:30:00';
+           } else if (!isEntry && hhmm >= '16:00' && hhmm <= '16:59') {
+              horaStr = '16:30:00';
+           }
+        }
+      }
+
       const row = worksheet.addRow({
         fecha: new Date(r.local_time).toLocaleDateString('es-ES', { timeZone: tz }),
-        hora: new Date(r.local_time).toLocaleTimeString('es-ES', { timeZone: tz }),
+        hora: horaStr,
         nombre: r.user_name,
         cedula: r.cedula || '-',
         cargo: r.user_position || '-',
