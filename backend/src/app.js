@@ -8,6 +8,7 @@ const WebSocket = require('ws');
 const env = require('./config/env');
 const qrService = require('./services/qrService');
 const { runMigrations } = require('./config/migrate');
+const { startAutoExitJob } = require('./jobs/autoExitJob');
 
 // Run DB migrations on startup (idempotent — safe to run every time)
 runMigrations();
@@ -55,6 +56,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 qrService.startRotationInterval().catch(err => {
   console.error('QR rotation startup error (non-fatal, will retry on next interval):', err.message);
 });
+
+// Start Auto-Exit Job (daily cron at 9:00 PM Panama time)
+startAutoExitJob();
 
 // API Routes
 app.use('/api/auth', authRoutes);

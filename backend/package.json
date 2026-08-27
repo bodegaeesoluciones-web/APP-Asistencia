@@ -25,6 +25,7 @@
     "isomorphic-fetch": "^3.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "node-cron": "^4.6.0",
     "pdfkit": "^0.14.0",
     "pg": "^8.11.3",
     "qrcode": "^1.5.3",
