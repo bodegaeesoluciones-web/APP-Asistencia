@@ -410,12 +410,23 @@ export default function PlanillaAsistencia({ users }) {
         timeStr = '07:30 AM';
       } else if (rec.type === 'exit' && rawTimeStr >= '16:00' && rawTimeStr <= '16:59') {
         timeStr = '04:30 PM';
+      } else if (rec.type === 'exit' && rawTimeStr >= '17:00' && rawTimeStr <= '20:59') {
+        const h = parseInt(rawTimeStr.slice(0, 2), 10);
+        const m = parseInt(rawTimeStr.slice(3, 5), 10);
+        const rm = m < 30 ? '00' : '30';
+        const ph = h > 12 ? h - 12 : h;
+        timeStr = `${ph.toString().padStart(2, '0')}:${rm} PM`;
       }
+      // Para 'Auto-salida' no mostrar el texto del estado, sino la hora real del registro
+      const displayStatus = (rec.manual_status && rec.manual_status !== 'Auto-salida')
+        ? rec.manual_status
+        : null;
+
       if (rec.type === 'entry') {
-        lookup[cedula][dateKey].entry = rec.manual_status || timeStr;
+        lookup[cedula][dateKey].entry = displayStatus || timeStr;
         lookup[cedula][dateKey].entryEdited = rec.is_manual_edit;
       } else {
-        lookup[cedula][dateKey].exit = rec.manual_status || timeStr;
+        lookup[cedula][dateKey].exit = displayStatus || timeStr;
         lookup[cedula][dateKey].exitEdited = rec.is_manual_edit;
       }
     });
@@ -531,10 +542,10 @@ export default function PlanillaAsistencia({ users }) {
               {/* ── Head ── */}
               <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(13, 17, 33, 0.98)', backdropFilter: 'blur(12px)' }}>
                 <tr>
-                  <th rowSpan={2} style={{ padding: '0.75rem 1rem', borderBottom: '2px solid rgba(99,102,241,0.3)', borderRight: '1px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left', minWidth: '180px', fontWeight: '600', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <th rowSpan={2} style={{ position: 'sticky', left: 0, zIndex: 20, background: 'rgba(13, 17, 33, 1)', padding: '0.75rem 1rem', borderBottom: '2px solid rgba(99,102,241,0.3)', borderRight: '1px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left', width: '240px', minWidth: '240px', maxWidth: '240px', fontWeight: '600', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Colaborador
                   </th>
-                  <th rowSpan={2} style={{ padding: '0.75rem 0.75rem', borderBottom: '2px solid rgba(99,102,241,0.3)', borderRight: '2px solid rgba(99,102,241,0.3)', color: 'var(--text-muted)', textAlign: 'center', minWidth: '90px', fontWeight: '600', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <th rowSpan={2} style={{ position: 'sticky', left: '240px', zIndex: 20, background: 'rgba(13, 17, 33, 1)', padding: '0.75rem 0.75rem', borderBottom: '2px solid rgba(99,102,241,0.3)', borderRight: '2px solid rgba(99,102,241,0.3)', color: 'var(--text-muted)', textAlign: 'center', width: '100px', minWidth: '100px', maxWidth: '100px', fontWeight: '600', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Cédula
                   </th>
                   {formattedDays.map(day => (
@@ -581,7 +592,7 @@ export default function PlanillaAsistencia({ users }) {
                     }}
                   >
                     {/* Name + position */}
-                    <td style={{ padding: '0.55rem 1rem', borderRight: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>
+                    <td style={{ position: 'sticky', left: 0, zIndex: 5, background: idx % 2 === 0 ? '#0d1121' : '#101426', padding: '0.55rem 1rem', borderRight: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '240px', minWidth: '240px', maxWidth: '240px' }}>
                       <div style={{ fontWeight: '600', fontSize: '0.82rem' }}>{row.name}</div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '1px' }}>
                         <Clock size={10} />
@@ -589,7 +600,7 @@ export default function PlanillaAsistencia({ users }) {
                       </div>
                     </td>
                     {/* Cedula */}
-                    <td style={{ padding: '0.55rem 0.75rem', borderRight: '2px solid rgba(99,102,241,0.3)', textAlign: 'center', fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    <td style={{ position: 'sticky', left: '240px', zIndex: 5, background: idx % 2 === 0 ? '#0d1121' : '#101426', padding: '0.55rem 0.75rem', borderRight: '2px solid rgba(99,102,241,0.3)', textAlign: 'center', fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', width: '100px', minWidth: '100px', maxWidth: '100px' }}>
                       {row.cedula}
                     </td>
 

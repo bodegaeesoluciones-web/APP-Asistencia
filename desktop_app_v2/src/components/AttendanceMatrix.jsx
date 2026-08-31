@@ -131,10 +131,21 @@ export default function AttendanceMatrix({ users }) {
       } else if (rec.type === 'exit' && rawTimeStr >= '16:00' && rawTimeStr <= '16:59') {
         timeStr = '04:30 PM';
         rawTimeStr = '16:30';
+      } else if (rec.type === 'exit' && rawTimeStr >= '17:00' && rawTimeStr <= '20:59') {
+        const h = parseInt(rawTimeStr.slice(0, 2), 10);
+        const m = parseInt(rawTimeStr.slice(3, 5), 10);
+        const rm = m < 30 ? '00' : '30';
+        const ph = h > 12 ? h - 12 : h;
+        timeStr = `${ph.toString().padStart(2, '0')}:${rm} PM`;
+        rawTimeStr = `${h.toString().padStart(2, '0')}:${rm}`;
       }
       
+      const displayStatus = (rec.manual_status && rec.manual_status !== 'Auto-salida')
+        ? rec.manual_status
+        : null;
+
       if (rec.type === 'entry') {
-        row.entry_time = rec.manual_status || timeStr;
+        row.entry_time = displayStatus || timeStr;
         row.raw_entry = rawTimeStr;
         row.photo_entry = rec.photo_url;
         row.is_valid = row.is_valid && rec.is_valid;
@@ -143,12 +154,12 @@ export default function AttendanceMatrix({ users }) {
         // Update IP/Device/Distance to the entry one if available
         if (rec.ip_address) row.ip_address = rec.ip_address;
         if (rec.device_name) row.device_name = rec.device_name;
-        if (rec.manual_status) row.manual_status = rec.manual_status;
+        if (displayStatus) row.manual_status = displayStatus;
       } else {
-        row.exit_time = rec.manual_status || timeStr;
+        row.exit_time = displayStatus || timeStr;
         row.raw_exit = rawTimeStr;
         row.photo_exit = rec.photo_url;
-        if (rec.manual_status) row.manual_status = rec.manual_status;
+        if (displayStatus) row.manual_status = displayStatus;
       }
     });
 
