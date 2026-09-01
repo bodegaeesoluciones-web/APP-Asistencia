@@ -84,17 +84,18 @@ exports.login = async (req, res) => {
           [user.id]
         );
 
-        if (parseInt(allUserDevices[0].count) === 0) {
-          // First device ever, auto-register
+        if (parseInt(allUserDevices[0].count) < 3) {
+          // Allow up to 3 'devices' (to handle WhatsApp in-app browser vs Chrome, or cleared cache)
+          const deviceLabel = deviceName ? deviceName : `Dispositivo ${parseInt(allUserDevices[0].count) + 1}`;
           const { rows: newDevice } = await pool.query(
             `INSERT INTO devices (user_id, device_fingerprint, device_name, user_agent, ip_address, is_active)
              VALUES ($1, $2, $3, $4, $5, true) RETURNING id`,
-            [user.id, deviceFingerprint, deviceName || 'Dispositivo Inicial', req.headers['user-agent'], req.ip]
+            [user.id, deviceFingerprint, deviceLabel, req.headers['user-agent'], req.ip]
           );
           isDeviceAuthorized = true;
           deviceId = newDevice[0].id;
         } else {
-          // Has devices, but not this one
+          // Max devices reached (3)
           await logAudit({
             userId: user.id,
             action: 'LOGIN_FAILED_UNAUTHORIZED_DEVICE',
@@ -104,7 +105,7 @@ exports.login = async (req, res) => {
             success: false,
           });
           return res.status(403).json({ 
-            error: 'Dispositivo no autorizado. Ya tiene un dispositivo registrado. Contacte al administrador.',
+            error: 'Límite de dispositivos alcanzado (Max 3). Contacte al administrador para resetear sus dispositivos.',
             code: 'DEVICE_NOT_AUTHORIZED'
           });
         }
