@@ -517,7 +517,11 @@
 
       } catch (err) {
         console.error('Login error:', err);
-        showAlert(`Error de conexión: ${err.message}. Verifica que el servidor esté disponible.`);
+        let errMsg = `Error de conexión: ${err.message}. Verifica que el servidor esté disponible.`;
+        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          errMsg = '❌ Error de red. Tu teléfono no tiene conexión a Internet en este momento. Por favor revisa tus datos móviles o Wi-Fi e intenta de nuevo.';
+        }
+        showAlert(errMsg);
       } finally {
         setLoading(false);
       }

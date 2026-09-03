@@ -964,14 +964,18 @@
     let nextAction = 'entry'; // will be updated from API
 
     async function loadTodayStatus() {
-      const res = await apiFetch('/api/attendance/today');
-      if (!res) return;
-      if (!res.ok) return;
-      const data = await res.json();
+      try {
+        const res = await apiFetch('/api/attendance/today');
+        if (!res || !res.ok) return;
+        const data = await res.json();
 
-      nextAction = data.nextAction || 'entry';
-      renderStatus(data.records, nextAction);
-      renderHistory(data.records);
+        nextAction = data.nextAction || 'entry';
+        renderStatus(data.records, nextAction);
+        renderHistory(data.records);
+      } catch (err) {
+        console.error('Failed to load today status:', err);
+        // We don't show alert here so it doesn't spam on refresh/reconnect
+      }
     }
 
     function renderStatus(records, next) {
@@ -1210,8 +1214,10 @@
 
       } catch (err) {
         closeCameraModal();
-        // Detect specific backend error codes
         let errMsg = `Error de conexión: ${err.message}`;
+        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          errMsg = '❌ Error de red (Failed to fetch). Parece que perdiste la conexión a Internet al intentar marcar. Revisa tu señal (WiFi/Datos móviles) e intenta de nuevo.';
+        }
         try {
           const errData = typeof err === 'object' && err.json ? await err.json() : null;
           if (errData && errData.code === 'DEVICE_NOT_AUTHORIZED') {

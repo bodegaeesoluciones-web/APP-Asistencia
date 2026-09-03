@@ -119,6 +119,11 @@ exports.exportExcel = async (req, res) => {
               horaStr = '7:30:00';
            } else if (!isEntry && hhmm >= '16:00' && hhmm <= '16:59') {
               horaStr = '16:30:00';
+           } else if (!isEntry && hhmm >= '17:00' && hhmm <= '20:59') {
+              const h = parseInt(hhmm.slice(0, 2), 10);
+              const m = parseInt(hhmm.slice(3, 5), 10);
+              const rm = m < 30 ? '00' : '30';
+              horaStr = `${h.toString().padStart(2, '0')}:${rm}:00`;
            }
         }
       }

@@ -1,8 +1,14 @@
 const { Pool } = require('pg');
 const { DATABASE_URL, NODE_ENV } = require('./env');
 
+// Remove sslmode=require from URL to prevent pg security warning
+let connectionString = DATABASE_URL;
+if (connectionString) {
+  connectionString = connectionString.replace(/\?sslmode=require/, '').replace(/&sslmode=require/, '');
+}
+
 const pool = new Pool({
-  connectionString: DATABASE_URL,
+  connectionString,
   ssl: NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   max: 10,
   idleTimeoutMillis: 30000,
