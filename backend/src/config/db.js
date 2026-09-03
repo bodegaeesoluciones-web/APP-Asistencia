@@ -1,10 +1,19 @@
 const { Pool } = require('pg');
 const { DATABASE_URL, NODE_ENV } = require('./env');
 
-// Remove sslmode=require from URL to prevent pg security warning
+// Strip all query parameters from the connection URL (sslmode, channel_binding, etc.)
+// so that pg does not misinterpret them as part of the database name.
+// SSL is configured explicitly via the 'ssl' option below.
 let connectionString = DATABASE_URL;
 if (connectionString) {
-  connectionString = connectionString.replace(/\?sslmode=require/, '').replace(/&sslmode=require/, '');
+  try {
+    const url = new URL(connectionString);
+    url.search = ''; // remove ALL query params (?sslmode=require&channel_binding=require etc.)
+    connectionString = url.toString();
+  } catch (_) {
+    // If URL parsing fails, fall back to simple regex strip
+    connectionString = connectionString.split('?')[0];
+  }
 }
 
 const pool = new Pool({
