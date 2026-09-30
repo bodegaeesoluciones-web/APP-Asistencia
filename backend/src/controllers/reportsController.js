@@ -32,7 +32,8 @@ async function getFilteredAttendance(req) {
            TO_CHAR(a.timestamp AT TIME ZONE $1, 'YYYY-MM-DD"T"HH24:MI:SS') as local_time,
            a.is_valid, a.rejection_reason, a.latitude, a.longitude,
            a.photo_url, a.ip_address, a.is_manual_edit, a.manual_status,
-           u.full_name as user_name, u.username as cedula, u.position as user_position, u.mobile_number, d.device_name
+           u.full_name as user_name, u.username as cedula, u.position as user_position, u.mobile_number, d.device_name,
+           u.entry_time, u.exit_time
     FROM attendance a
     JOIN users u ON a.user_id = u.id
     LEFT JOIN devices d ON a.device_id = d.id
@@ -115,8 +116,16 @@ exports.exportExcel = async (req, res) => {
         const timePart = r.local_time.split('T')[1];
         if (timePart) {
            const hhmm = timePart.substring(0, 5);
-           if (isEntry && hhmm >= '07:00' && hhmm <= '07:40') {
-              horaStr = '7:30:00';
+           const sched = r.entry_time || '07:30';
+
+           if (isEntry) {
+              if (sched === '08:30' && hhmm >= '08:10' && hhmm <= '08:35') {
+                 horaStr = '8:30:00';
+              } else if (sched === '07:30' && hhmm >= '07:01' && hhmm <= '07:40') {
+                 horaStr = '7:30:00';
+              } else if (sched === '07:00' && hhmm >= '06:30' && hhmm <= '06:59') {
+                 horaStr = '7:00:00';
+              }
            } else if (!isEntry && hhmm >= '16:00' && hhmm <= '16:59') {
               horaStr = '16:30:00';
            } else if (!isEntry && hhmm >= '17:00' && hhmm <= '20:59') {

@@ -405,9 +405,17 @@ export default function PlanillaAsistencia({ users }) {
       let timeStr = formatTimeFromLocalStr(rec.local_time);
       const rawTimeStr = rec.local_time.split('T')[1].slice(0, 5); // '08:00'
       
+      const schedEntry = rec.entry_time || '07:30';
+
       // Override default times (visual only)
-      if (rec.type === 'entry' && rawTimeStr >= '07:00' && rawTimeStr <= '07:40') {
-        timeStr = '07:30 AM';
+      if (rec.type === 'entry') {
+        if (schedEntry === '08:30' && rawTimeStr >= '08:10' && rawTimeStr <= '08:35') {
+          timeStr = '08:30 AM';
+        } else if (schedEntry === '07:30' && rawTimeStr >= '07:01' && rawTimeStr <= '07:40') {
+          timeStr = '07:30 AM';
+        } else if (schedEntry === '07:00' && rawTimeStr >= '06:30' && rawTimeStr <= '06:59') {
+          timeStr = '07:00 AM';
+        }
       } else if (rec.type === 'exit' && rawTimeStr >= '16:00' && rawTimeStr <= '16:59') {
         timeStr = '04:30 PM';
       } else if (rec.type === 'exit' && rawTimeStr >= '17:00' && rawTimeStr <= '20:59') {
