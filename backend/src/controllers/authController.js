@@ -15,8 +15,9 @@ function generateTokens(userId) {
 exports.login = async (req, res) => {
   const { username, password, deviceFingerprint, deviceName } = req.body;
 
-  if (!username || !password || !deviceFingerprint) {
-    return res.status(400).json({ error: 'Faltan credenciales o identificador de dispositivo' });
+  // deviceFingerprint is now optional — no device restriction
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Faltan credenciales' });
   }
 
   try {
@@ -30,7 +31,7 @@ exports.login = async (req, res) => {
         action: 'LOGIN_FAILED',
         details: { reason: 'User not found', username },
         ipAddress: req.ip,
-        deviceFingerprint,
+        deviceFingerprint: deviceFingerprint || null,
         success: false,
       });
       return res.status(401).json({ error: 'Credenciales inválidas' });
@@ -44,7 +45,7 @@ exports.login = async (req, res) => {
         action: 'LOGIN_FAILED',
         details: { reason: 'Account inactive' },
         ipAddress: req.ip,
-        deviceFingerprint,
+        deviceFingerprint: deviceFingerprint || null,
         success: false,
       });
       return res.status(403).json({ error: 'Cuenta inactiva' });
@@ -57,79 +58,39 @@ exports.login = async (req, res) => {
         action: 'LOGIN_FAILED',
         details: { reason: 'Invalid password' },
         ipAddress: req.ip,
-        deviceFingerprint,
+        deviceFingerprint: deviceFingerprint || null,
         success: false,
       });
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    // Device validation
-    let isDeviceAuthorized = false;
+    // Device restriction removed — all technicians can log in from any device.
+    // We optionally register the device for audit/tracking purposes only.
     let deviceId = null;
-
-    if (user.role === 'admin') {
-      // Admins bypass strict device checking for login, but we still log it
-      isDeviceAuthorized = true;
-    } else {
-      // For technicians
-      const { rows: devices } = await pool.query(
-        'SELECT id, is_active FROM devices WHERE user_id = $1 AND device_fingerprint = $2',
-        [user.id, deviceFingerprint]
-      );
-
-      if (devices.length === 0) {
-        // First time login for this user? Check if they have ANY devices
-        const { rows: allUserDevices } = await pool.query(
-          'SELECT COUNT(*) as count FROM devices WHERE user_id = $1',
-          [user.id]
+    if (deviceFingerprint && user.role !== 'admin') {
+      try {
+        const { rows: existing } = await pool.query(
+          'SELECT id FROM devices WHERE user_id = $1 AND device_fingerprint = $2',
+          [user.id, deviceFingerprint]
         );
-
-        if (parseInt(allUserDevices[0].count) < 3) {
-          // Allow up to 3 'devices' (to handle WhatsApp in-app browser vs Chrome, or cleared cache)
+        if (existing.length === 0) {
+          const { rows: allUserDevices } = await pool.query(
+            'SELECT COUNT(*) as count FROM devices WHERE user_id = $1',
+            [user.id]
+          );
           const deviceLabel = deviceName ? deviceName : `Dispositivo ${parseInt(allUserDevices[0].count) + 1}`;
           const { rows: newDevice } = await pool.query(
             `INSERT INTO devices (user_id, device_fingerprint, device_name, user_agent, ip_address, is_active)
              VALUES ($1, $2, $3, $4, $5, true) RETURNING id`,
             [user.id, deviceFingerprint, deviceLabel, req.headers['user-agent'], req.ip]
           );
-          isDeviceAuthorized = true;
           deviceId = newDevice[0].id;
         } else {
-          // Max devices reached (3)
-          await logAudit({
-            userId: user.id,
-            action: 'LOGIN_FAILED_UNAUTHORIZED_DEVICE',
-            details: { deviceFingerprint, userAgent: req.headers['user-agent'] },
-            ipAddress: req.ip,
-            deviceFingerprint,
-            success: false,
-          });
-          return res.status(403).json({ 
-            error: 'Límite de dispositivos alcanzado (Max 3). Contacte al administrador para resetear sus dispositivos.',
-            code: 'DEVICE_NOT_AUTHORIZED'
-          });
+          deviceId = existing[0].id;
+          await pool.query('UPDATE devices SET ip_address = $1 WHERE id = $2', [req.ip, deviceId]);
         }
-      } else {
-        const device = devices[0];
-        if (!device.is_active) {
-          await logAudit({
-            userId: user.id,
-            action: 'LOGIN_FAILED_INACTIVE_DEVICE',
-            details: { deviceFingerprint },
-            ipAddress: req.ip,
-            deviceFingerprint,
-            success: false,
-          });
-          return res.status(403).json({ 
-            error: 'Este dispositivo ha sido desactivado. Contacte al administrador.',
-            code: 'DEVICE_INACTIVE'
-          });
-        }
-        isDeviceAuthorized = true;
-        deviceId = device.id;
-        
-        // Update last seen IP
-        await pool.query('UPDATE devices SET ip_address = $1 WHERE id = $2', [req.ip, device.id]);
+      } catch (_) {
+        // Non-critical: device tracking failed, login still proceeds
       }
     }
 

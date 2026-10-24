@@ -3,7 +3,7 @@ const router = express.Router();
 const attendanceController = require('../controllers/attendanceController');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { authenticateToken } = require('../middleware/auth');
-const { deviceCheck } = require('../middleware/deviceCheck');
+// deviceCheck removed — technicians can mark from any device
 const { body, validationResult } = require('express-validator');
 
 const validateRequest = (req, res, next) => {
@@ -18,7 +18,7 @@ router.post(
   '/mark',
   apiLimiter,
   authenticateToken,
-  deviceCheck,
+  // deviceCheck removed — no device restriction
   [
     body('latitude').isFloat().withMessage('Latitud inválida'),
     body('longitude').isFloat().withMessage('Longitud inválida'),

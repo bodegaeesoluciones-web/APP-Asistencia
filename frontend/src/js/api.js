@@ -9,31 +9,99 @@ export const formatError = (err) => {
   return err.message || 'Error de conexión con el servidor';
 };
 
-// Generate a simple device fingerprint
-export const getDeviceFingerprint = async () => {
-  // Check if we already have one stored
-  let fp = localStorage.getItem('device_fingerprint');
-  if (fp) return fp;
-
-  // Generate a simple fingerprint based on browser info
-  const navigatorInfo = `${navigator.userAgent}${navigator.language}${navigator.platform}`;
-  const screenInfo = `${screen.width}x${screen.height}x${screen.colorDepth}`;
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  
-  // Create a hash (simple implementation for client side)
-  const str = `${navigatorInfo}|${screenInfo}|${timezone}`;
-  let hash = 0;
+// Generate a stable, deterministic device fingerprint.
+// Does NOT use randomness — the same device/browser always produces the same fingerprint.
+// Persists in localStorage, sessionStorage and a long-lived cookie so it
+// survives individual storage clears.
+function _simpleHash(str) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
   for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
   }
-  
-  // Add some randomness to ensure uniqueness if fingerprint is identical
-  const randomStr = Math.random().toString(36).substring(2, 10);
-  fp = `dev_${Math.abs(hash)}_${randomStr}`;
-  
-  localStorage.setItem('device_fingerprint', fp);
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+}
+
+function _buildFingerprintString() {
+  const nav = navigator;
+  const scr = screen;
+
+  // Canvas fingerprint (hardware/driver-level rendering differences)
+  let canvasHash = '0';
+  try {
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#f60';
+    ctx.fillRect(125, 1, 62, 20);
+    ctx.fillStyle = '#069';
+    ctx.fillText('AsistTrack🔐', 2, 15);
+    ctx.fillStyle = 'rgba(102,204,0,0.7)';
+    ctx.fillText('AsistTrack🔐', 4, 17);
+    canvasHash = _simpleHash(c.toDataURL());
+  } catch (_) { /* canvas blocked — ok */ }
+
+  const signals = [
+    nav.userAgent,
+    nav.language || nav.languages?.join(',') || '',
+    nav.platform,
+    `${scr.width}x${scr.height}`,
+    `${scr.availWidth}x${scr.availHeight}`,
+    String(scr.colorDepth),
+    String(scr.pixelDepth),
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    String(nav.hardwareConcurrency || ''),
+    String(nav.deviceMemory || ''),
+    String(nav.maxTouchPoints || '0'),
+    canvasHash,
+  ].join('|');
+
+  return `dev_${_simpleHash(signals)}`;
+}
+
+function _saveFingerprintAllStorages(fp) {
+  try { localStorage.setItem('device_fingerprint', fp); } catch (_) {}
+  try { sessionStorage.setItem('device_fingerprint', fp); } catch (_) {}
+  // Long-lived cookie (365 days) as last-resort persistence
+  try {
+    const exp = new Date();
+    exp.setFullYear(exp.getFullYear() + 1);
+    document.cookie = `dfp=${fp};expires=${exp.toUTCString()};path=/;SameSite=Strict`;
+  } catch (_) {}
+}
+
+function _loadFingerprintFromAnyStorage() {
+  try {
+    const ls = localStorage.getItem('device_fingerprint');
+    if (ls) return ls;
+  } catch (_) {}
+  try {
+    const ss = sessionStorage.getItem('device_fingerprint');
+    if (ss) return ss;
+  } catch (_) {}
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)dfp=([^;]+)/);
+    if (match) return match[1];
+  } catch (_) {}
+  return null;
+}
+
+export const getDeviceFingerprint = () => {
+  // Try to recover from any available storage first
+  let fp = _loadFingerprintFromAnyStorage();
+
+  // If not found (first time ever, or all storages cleared), compute deterministically
+  if (!fp) {
+    fp = _buildFingerprintString();
+  }
+
+  // Always persist in all storages (re-syncs if some were cleared)
+  _saveFingerprintAllStorages(fp);
+
   return fp;
 };
 
@@ -41,11 +109,10 @@ export const getDeviceFingerprint = async () => {
 export const api = {
   async fetch(endpoint, options = {}) {
     const token = localStorage.getItem('access_token');
-    const fingerprint = await getDeviceFingerprint();
     
     const headers = {
       'Content-Type': 'application/json',
-      'x-device-fingerprint': fingerprint,
+      // x-device-fingerprint removed — no device restriction
       ...options.headers,
     };
 
